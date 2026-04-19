@@ -1,0 +1,89 @@
+/*
+ * Direct GitHub Sync — styles.css
+ *
+ * Drop this alongside main.js and manifest.json in:
+ *   <vault>/.obsidian/plugins/direct-github-sync/
+ *
+ * Obsidian loads styles.css automatically for community plugins.
+ */
+
+/* ── Conflict modal ─────────────────────────────────────────────────────── */
+
+.dgs-modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.dgs-modal-btns button {
+  flex: 1 1 auto;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.93em;
+  cursor: pointer;
+}
+
+/* "Force Push" button — uses Obsidian's warning colour token */
+.dgs-btn-warning {
+  background-color: var(--color-red);
+  color: #fff;
+  border: none;
+}
+
+.dgs-btn-warning:hover {
+  filter: brightness(1.1);
+}
+
+/* monospace commit SHA display */
+.dgs-mono {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* ── Settings tab ───────────────────────────────────────────────────────── */
+
+/* Section notes — the grey italic note below each h3 */
+.dgs-section-note {
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
+/* Inline validation result panel */
+.dgs-validation-result {
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 0.9em;
+  line-height: 1.5;
+  white-space: pre-wrap;        /* preserve newlines in multi-line messages */
+  border-left: 3px solid transparent;
+}
+
+.dgs-hidden {
+  display: none;
+}
+
+/* Success */
+.dgs-validation-result.dgs-ok {
+  background-color: var(--background-modifier-success);
+  color: var(--text-success);
+  border-left-color: var(--color-green);
+}
+
+/* Error */
+.dgs-validation-result.dgs-err {
+  background-color: var(--background-modifier-error);
+  color: var(--text-error);
+  border-left-color: var(--color-red);
+}
+
+/* Info / loading */
+.dgs-validation-result.dgs-info {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  border-left-color: var(--text-accent);
+}

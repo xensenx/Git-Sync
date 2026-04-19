@@ -2,14 +2,14 @@
  * Direct GitHub Sync — Obsidian Plugin
  * main.js (vanilla JS, no build step required)
  *
- * Drop this file alongside manifest.json into:
+ * Drop this file alongside manifest.json and styles.css into:
  *   <vault>/.obsidian/plugins/direct-github-sync/
  * then enable it in Settings → Community Plugins.
  */
 
 "use strict";
 
-const { Plugin, PluginSettingTab, Setting, Notice, requestUrl } =
+const { Plugin, PluginSettingTab, Setting, Notice, Modal, requestUrl } =
   require("obsidian");
 
 // ─────────────────────────────────────────────
@@ -21,28 +21,66 @@ const DEFAULT_SETTINGS = {
   repo: "",
   branch: "main",
   ignoreObsidianDir: true,
-  deviceName: "",          // optional — shown in commit messages
-  // Max simultaneous GitHub API requests. 5 is safe and fast.
-  // Lower this if you see rate-limit errors on a slow connection.
+  deviceName: "",
   concurrency: 5,
   // filepath -> blob SHA of the last successfully pulled/pushed state.
-  // Used to skip unchanged files — never edit this manually.
+  // Never edit this manually.
   lastPulledShas: {},
+  // The remote commit SHA we last successfully synced against.
+  // Used for conflict detection on push.
+  lastKnownRemoteCommit: "",
 };
 
 const GITHUB_API = "https://api.github.com";
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2500;
 
 // ─────────────────────────────────────────────
-//  Helpers
+//  Low-level helpers
 // ─────────────────────────────────────────────
+
+/** Sleep for ms milliseconds. */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
- * Run an array of async task-factory functions in a controlled concurrency pool.
- * At most `concurrency` tasks run at the same time.
- * Returns results in the same order as the input array.
- *
- * Using a pool (rather than Promise.all) avoids hammering GitHub with
- * hundreds of simultaneous requests while still being much faster than serial.
+ * Retry wrapper. Attempts fn up to MAX_RETRIES+1 times with RETRY_DELAY_MS
+ * between each attempt.  Auth/config errors (401, 403, 404, 422) are NOT
+ * retried because they won't fix themselves on their own.
+ */
+async function withRetry(fn, label) {
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (
+        e.status === 401 ||
+        e.status === 403 ||
+        e.status === 404 ||
+        e.status === 422
+      ) {
+        throw e; // permanent — don't retry
+      }
+      lastErr = e;
+      if (attempt <= MAX_RETRIES) {
+        console.warn(
+          `[Direct GitHub Sync] "${label}" failed (attempt ${attempt}/${
+            MAX_RETRIES + 1
+          }), retrying in ${RETRY_DELAY_MS}ms… (${e.message})`
+        );
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Run tasks in a bounded concurrency pool.
+ * Returns an array of { ok, value } | { ok: false, error, item } objects
+ * in the same order as `items`.  A failure in one task never aborts others.
  */
 async function parallelBatch(items, concurrency, fn) {
   const results = new Array(items.length);
@@ -51,17 +89,26 @@ async function parallelBatch(items, concurrency, fn) {
   async function worker() {
     while (index < items.length) {
       const i = index++;
-      results[i] = await fn(items[i], i);
+      try {
+        results[i] = { ok: true, value: await fn(items[i], i) };
+      } catch (e) {
+        results[i] = { ok: false, error: e, item: items[i] };
+      }
     }
   }
 
   const workers = [];
-  for (let i = 0; i < Math.min(concurrency, items.length); i++) {
+  for (let w = 0; w < Math.min(concurrency, items.length); w++) {
     workers.push(worker());
   }
   await Promise.all(workers);
   return results;
 }
+
+// ─────────────────────────────────────────────
+//  Encoding helpers
+// ─────────────────────────────────────────────
+
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -71,9 +118,6 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-/**
- * Convert a Base64 string back to an ArrayBuffer.
- */
 function base64ToArrayBuffer(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -83,32 +127,23 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-/**
- * Sanitise a path so it is always relative and forward-slash separated.
- * Obsidian may return paths with a leading slash on some platforms.
- */
+/** Ensure paths are always relative with forward slashes. */
 function normalisePath(p) {
   return p.replace(/^\/+/, "").replace(/\\/g, "/");
 }
 
 /**
- * Compute the Git blob SHA for an ArrayBuffer.
- *
- * Git's blob SHA is:  sha1("blob " + byteLength + "\0" + fileBytes)
- *
- * We use the WebCrypto API (available in both Obsidian desktop and mobile)
- * to produce this without any Node.js dependency.
- *
- * Returns a lowercase hex string identical to what GitHub stores in its tree,
- * allowing us to diff local files against the remote tree without any API calls.
+ * Compute the Git blob SHA for an ArrayBuffer using WebCrypto.
+ * Git blob SHA = sha1("blob " + byteLength + "\0" + fileBytes)
  */
 async function computeGitBlobSha(arrayBuffer) {
   const fileBytes = new Uint8Array(arrayBuffer);
   const header = `blob ${fileBytes.byteLength}\0`;
   const headerBytes = new TextEncoder().encode(header);
 
-  // Concatenate header + file content into one buffer
-  const combined = new Uint8Array(headerBytes.byteLength + fileBytes.byteLength);
+  const combined = new Uint8Array(
+    headerBytes.byteLength + fileBytes.byteLength
+  );
   combined.set(headerBytes, 0);
   combined.set(fileBytes, headerBytes.byteLength);
 
@@ -120,29 +155,83 @@ async function computeGitBlobSha(arrayBuffer) {
 
 /**
  * Build the commit message.
- * Format: "Vault push from {device}: {date} at {time}"
- *         "Vault push: {date} at {time}"  (when no device name set)
- *
- * Date: DD MMM YYYY  e.g. "19 Apr 2026"
- * Time: HH:MM        e.g. "14:03"  (local time, 24-hour)
+ * "Vault push from {device}: DD MMM YYYY at HH:MM"
+ * "Vault push: DD MMM YYYY at HH:MM"  (when no device name)
  */
 function buildCommitMessage(deviceName) {
   const now = new Date();
-
-  const months = ["Jan","Feb","Mar","Apr","May","Jun",
-                  "Jul","Aug","Sep","Oct","Nov","Dec"];
+  const months = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec",
+  ];
   const date = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-
-  const from = deviceName && deviceName.trim()
-    ? ` from ${deviceName.trim()}`
-    : "";
-
+  const time = `${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes()
+  ).padStart(2, "0")}`;
+  const from =
+    deviceName && deviceName.trim() ? ` from ${deviceName.trim()}` : "";
   return `Vault push${from}: ${date} at ${time}`;
 }
 
 // ─────────────────────────────────────────────
-//  GitHub REST helpers (all use requestUrl)
+//  Conflict confirmation modal
+// ─────────────────────────────────────────────
+
+class ConflictModal extends Modal {
+  /**
+   * @param {App} app
+   * @param {string} remoteCommitSha  - the newer remote commit we detected
+   * @param {() => void} onForce      - called if user clicks "Force Push"
+   * @param {() => void} onCancel     - called if user cancels
+   */
+  constructor(app, remoteCommitSha, onForce, onCancel) {
+    super(app);
+    this.remoteCommitSha = remoteCommitSha;
+    this.onForce = onForce;
+    this.onCancel = onCancel;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "⚠️ Remote Has Newer Commits" });
+    contentEl.createEl("p", {
+      text: "The remote repository has commits that are newer than your last sync. Pushing now will overwrite those remote changes and they will be lost.",
+    });
+    contentEl.createEl("p", {
+      text: `Remote commit: ${this.remoteCommitSha.slice(0, 12)}…`,
+      cls: "dgs-mono",
+    });
+    contentEl.createEl("p", {
+      text: "Recommended action: Pull first to bring those changes locally, then push.",
+    });
+
+    const row = contentEl.createDiv({ cls: "dgs-modal-btns" });
+
+    const cancelBtn = row.createEl("button", {
+      text: "Cancel (recommended)",
+    });
+    cancelBtn.addClass("mod-cta");
+    cancelBtn.onclick = () => {
+      this.close();
+      this.onCancel();
+    };
+
+    const forceBtn = row.createEl("button", { text: "Force Push Anyway" });
+    forceBtn.addClass("dgs-btn-warning");
+    forceBtn.onclick = () => {
+      this.close();
+      this.onForce();
+    };
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GitHub REST client
 // ─────────────────────────────────────────────
 
 class GitHubClient {
@@ -152,6 +241,7 @@ class GitHubClient {
     this.repo = repo;
     this.branch = branch;
     this.base = `${GITHUB_API}/repos/${username}/${repo}`;
+    this._established = false;
   }
 
   get _headers() {
@@ -163,41 +253,90 @@ class GitHubClient {
     };
   }
 
+  /**
+   * Core request. Wraps requestUrl and translates HTTP errors into descriptive
+   * messages. Each call is already wrapped with withRetry at call sites.
+   */
   async _req(method, url, body) {
     const opts = { url, method, headers: this._headers };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    const resp = await requestUrl(opts);
+
+    let resp;
+    try {
+      resp = await requestUrl(opts);
+    } catch (netErr) {
+      // requestUrl throws on DNS/timeout/offline failures
+      const e = new Error(
+        `Network error — check your internet connection. (${netErr.message})`
+      );
+      e.status = 0;
+      throw e;
+    }
+
     if (resp.status >= 400) {
-      const msg =
-        resp.json?.message || resp.text || `HTTP ${resp.status}`;
-      const err = new Error(`GitHub API error (${resp.status}): ${msg}`);
-      err.status = resp.status;
-      throw err;
+      const ghMsg = resp.json?.message || resp.text || "";
+      const e = new Error(this._friendlyError(resp.status, url, ghMsg));
+      e.status = resp.status;
+      e.ghMessage = ghMsg;
+      throw e;
     }
     return resp.json;
   }
 
-  // ── READ ──────────────────────────────────
+  /** Map HTTP status codes to plain-English error messages. */
+  _friendlyError(status, url, ghMsg) {
+    const isRepoEndpoint =
+      url.includes(`/repos/${this.username}/${this.repo}`);
 
-  /** Get the latest commit SHA and tree SHA for the branch — single API call. */
-  async getLatestCommit() {
-    // The Commits API returns the commit object directly, including tree SHA,
-    // saving one serial round-trip compared to ref → commit → tree.
-    const data = await this._req(
-      "GET",
-      `${this.base}/commits/${this.branch}`
-    );
-    return {
-      commitSha: data.sha,
-      treeSha: data.commit.tree.sha,
-    };
+    switch (status) {
+      case 401:
+        return "Authentication failed — your PAT is invalid or has expired. Open plugin settings and update it.";
+      case 403:
+        if (ghMsg.toLowerCase().includes("rate limit")) {
+          return "GitHub rate limit exceeded. Wait a few minutes and try again.";
+        }
+        return "Access forbidden — your PAT may lack the 'repo' scope, or this repository is private and inaccessible with the current PAT.";
+      case 404:
+        if (isRepoEndpoint && url.includes(`/commits/${this.branch}`)) {
+          return `Branch "${this.branch}" not found in "${this.username}/${this.repo}". Check the branch name in settings.`;
+        }
+        if (isRepoEndpoint) {
+          return `Repository "${this.username}/${this.repo}" not found. Verify the username and repository name in settings.`;
+        }
+        return `Resource not found (404): ${url}`;
+      case 409:
+        return `Repository "${this.username}/${this.repo}" is empty — push will initialise it automatically.`;
+      case 422:
+        return `GitHub rejected the request (422): ${
+          ghMsg || "check your branch name and repo settings."
+        }`;
+      case 0:
+        return "Network error — please check your internet connection and try again.";
+      default:
+        return `GitHub API error (${status}): ${ghMsg || "unknown error"}`;
+    }
   }
 
-  /** Get the full recursive tree for a given tree SHA. */
+  // ── Read ──────────────────────────────────────────────────────────────
+
+  /** Latest commit SHA + tree SHA for the configured branch. */
+  async getLatestCommit() {
+    const data = await withRetry(
+      () => this._req("GET", `${this.base}/commits/${this.branch}`),
+      `getLatestCommit(${this.branch})`
+    );
+    return { commitSha: data.sha, treeSha: data.commit.tree.sha };
+  }
+
+  /** Full recursive tree for a given tree SHA. */
   async getFullTree(treeSha) {
-    const data = await this._req(
-      "GET",
-      `${this.base}/git/trees/${treeSha}?recursive=1`
+    const data = await withRetry(
+      () =>
+        this._req(
+          "GET",
+          `${this.base}/git/trees/${treeSha}?recursive=1`
+        ),
+      `getFullTree(${treeSha.slice(0, 8)})`
     );
     if (data.truncated) {
       new Notice(
@@ -210,90 +349,217 @@ class GitHubClient {
 
   /** Fetch a single blob as Base64. */
   async getBlob(sha) {
-    const data = await this._req(
-      "GET",
-      `${this.base}/git/blobs/${sha}`
+    const data = await withRetry(
+      () => this._req("GET", `${this.base}/git/blobs/${sha}`),
+      `getBlob(${sha.slice(0, 8)})`
     );
-    return data.content.replace(/\n/g, ""); // strip newlines added by GitHub
+    return data.content.replace(/\n/g, "");
   }
 
-  // ── WRITE ─────────────────────────────────
+  // ── Write ─────────────────────────────────────────────────────────────
 
   /** Create a blob. Returns its SHA. */
   async createBlob(base64Content) {
-    const data = await this._req("POST", `${this.base}/git/blobs`, {
-      content: base64Content,
-      encoding: "base64",
-    });
+    const data = await withRetry(
+      () =>
+        this._req("POST", `${this.base}/git/blobs`, {
+          content: base64Content,
+          encoding: "base64",
+        }),
+      "createBlob"
+    );
     return data.sha;
   }
 
-  /** Create a new tree on top of a base tree. Returns new tree SHA. */
-  async createTree(baseTreeSha, treeItems) {
-    const data = await this._req("POST", `${this.base}/git/trees`, {
-      base_tree: baseTreeSha,
-      tree: treeItems,
-    });
+  /**
+   * Create a tree based on baseTreeSha.
+   * treeItems:  normal { path, mode, type, sha } entries.
+   * deletions:  paths to remove — sent as sha: null entries.
+   */
+  async createTree(baseTreeSha, treeItems, deletions = []) {
+    const deleteEntries = deletions.map((path) => ({
+      path,
+      mode: "100644",
+      type: "blob",
+      sha: null,
+    }));
+    const data = await withRetry(
+      () =>
+        this._req("POST", `${this.base}/git/trees`, {
+          base_tree: baseTreeSha,
+          tree: [...treeItems, ...deleteEntries],
+        }),
+      "createTree"
+    );
     return data.sha;
   }
 
   /** Create a commit. Returns new commit SHA. */
   async createCommit(message, treeSha, parentSha) {
-    const data = await this._req("POST", `${this.base}/git/commits`, {
-      message,
-      tree: treeSha,
-      parents: [parentSha],
-    });
+    const data = await withRetry(
+      () =>
+        this._req("POST", `${this.base}/git/commits`, {
+          message,
+          tree: treeSha,
+          parents: [parentSha],
+        }),
+      "createCommit"
+    );
     return data.sha;
   }
 
-  /** Update the branch ref to point to a new commit SHA. */
+  /** Move the branch ref to commitSha. */
   async updateRef(commitSha) {
-    await this._req(
-      "PATCH",
-      `${this.base}/git/refs/heads/${this.branch}`,
-      { sha: commitSha, force: false }
+    await withRetry(
+      () =>
+        this._req(
+          "PATCH",
+          `${this.base}/git/refs/heads/${this.branch}`,
+          { sha: commitSha, force: false }
+        ),
+      "updateRef"
     );
   }
 
   /**
-   * Ensure the branch exists and is ready. Returns false if already established,
-   * true if it just bootstrapped. Throws if the repo itself is inaccessible.
-   *
-   * We cache the "established" state in memory so repeated push/pull in the
-   * same session skips all these preflight API calls entirely.
+   * Ensure the branch exists, bootstrapping an empty repo if necessary.
+   * Returns true if just initialised, false if already established.
    */
   async initRepoIfNeeded() {
     if (this._established) return false;
 
-    // Try getLatestCommit — if it works, we're done.
     try {
       await this.getLatestCommit();
       this._established = true;
       return false;
     } catch (e) {
-      // 404 = repo not found or no branch yet; 409 = repo empty
       if (e.status !== 404 && e.status !== 409) throw e;
     }
 
-    // Verify the repo itself is accessible before attempting to bootstrap
+    // Confirm the repo itself exists before trying to write to it.
+    // Wrapped with withRetry so transient network errors don't abort the bootstrap.
     try {
-      await this._req("GET", `${this.base}`);
-    } catch {
-      throw new Error(
-        `Repository "${this.username}/${this.repo}" not found or PAT lacks access.`
+      await withRetry(
+        () => this._req("GET", `${this.base}`),
+        "check repo existence"
       );
+    } catch (e) {
+      if (e.status === 404) {
+        throw new Error(
+          `Repository "${this.username}/${this.repo}" not found. ` +
+            `Verify the username and repo name in settings.`
+        );
+      }
+      throw e;
     }
 
-    // Bootstrap: Contents API is the only reliable way to seed a zero-commit repo
-    await this._req("PUT", `${this.base}/contents/.gitkeep`, {
-      message: "Initial commit (Direct GitHub Sync)",
-      content: btoa(""),
-      branch: this.branch,
-    });
+    // Seed the repo with a .gitkeep so there's a valid commit to build on
+    await withRetry(
+      () =>
+        this._req("PUT", `${this.base}/contents/.gitkeep`, {
+          message: "Initial commit (Direct GitHub Sync)",
+          content: btoa(""),
+          branch: this.branch,
+        }),
+      "bootstrap .gitkeep"
+    );
 
     this._established = true;
     return true;
+  }
+
+  /**
+   * Validate PAT + username + repo + branch without writing anything.
+   * Returns { ok: boolean, message: string }.
+   */
+  async validateSettings() {
+    // Step 1 — Check the PAT and confirm the username
+    let userResp;
+    try {
+      userResp = await requestUrl({
+        url: `${GITHUB_API}/user`,
+        method: "GET",
+        headers: this._headers,
+      });
+    } catch (netErr) {
+      return {
+        ok: false,
+        message: "Network error — check your internet connection.",
+      };
+    }
+
+    if (userResp.status === 401) {
+      return {
+        ok: false,
+        message:
+          "PAT is invalid or expired. Generate a new one at GitHub → Settings → Developer settings → Personal access tokens.",
+      };
+    }
+    if (userResp.status === 403) {
+      return {
+        ok: false,
+        message:
+          "PAT lacks permissions. Ensure it has the 'repo' scope (or 'Contents: Read & Write' for fine-grained tokens).",
+      };
+    }
+
+    const actualLogin = userResp.json?.login || "";
+    if (actualLogin.toLowerCase() !== this.username.toLowerCase()) {
+      return {
+        ok: false,
+        message: `Username mismatch — this PAT belongs to "${actualLogin}", but settings say "${this.username}". Update the username field.`,
+      };
+    }
+
+    // Step 2 — Check repo access
+    let repoResp;
+    try {
+      repoResp = await requestUrl({
+        url: `${this.base}`,
+        method: "GET",
+        headers: this._headers,
+      });
+    } catch (netErr) {
+      return {
+        ok: false,
+        message: `Network error while checking repository: ${netErr.message}`,
+      };
+    }
+
+    if (repoResp.status === 404) {
+      return {
+        ok: false,
+        message: `Repository "${this.username}/${this.repo}" not found. Check the name and confirm the PAT has access.`,
+      };
+    }
+    if (repoResp.status === 403) {
+      return {
+        ok: false,
+        message: `PAT doesn't have access to "${this.username}/${this.repo}". Check repository permissions.`,
+      };
+    }
+
+    // Step 3 — Check branch (non-fatal: could be an empty repo with no branches yet)
+    try {
+      const branchResp = await requestUrl({
+        url: `${this.base}/branches/${this.branch}`,
+        method: "GET",
+        headers: this._headers,
+      });
+      if (branchResp.status === 404) {
+        return {
+          ok: false,
+          message: `Branch "${this.branch}" not found in "${this.username}/${this.repo}". Check the branch name — or push to create it.`,
+        };
+      }
+    } catch {
+      // Ignore — empty repo with no branches yet is fine; push will bootstrap it
+    }
+
+    return {
+      ok: true,
+      message: `Connected to ${this.username}/${this.repo} on branch "${this.branch}" ✓`,
+    };
   }
 }
 
@@ -305,15 +571,11 @@ class DirectGitHubSyncPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    // ── Ribbon icons ──────────────────────────
-    this.addRibbonIcon("upload", "Push vault to GitHub", () =>
-      this.push()
-    );
+    this.addRibbonIcon("upload", "Push vault to GitHub", () => this.push());
     this.addRibbonIcon("download", "Pull vault from GitHub", () =>
       this.pull()
     );
 
-    // ── Command palette ───────────────────────
     this.addCommand({
       id: "push-to-github",
       name: "Push vault to GitHub",
@@ -325,7 +587,6 @@ class DirectGitHubSyncPlugin extends Plugin {
       callback: () => this.pull(),
     });
 
-    // ── Settings tab ──────────────────────────
     this.addSettingTab(new DirectGitHubSyncSettingTab(this.app, this));
 
     console.log("[Direct GitHub Sync] Plugin loaded.");
@@ -335,21 +596,35 @@ class DirectGitHubSyncPlugin extends Plugin {
     console.log("[Direct GitHub Sync] Plugin unloaded.");
   }
 
-  // ── Persistence ───────────────────────────
+  // ── Persistence ───────────────────────────────────────────────────────
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
+
   async saveSettings() {
     await this.saveData(this.settings);
   }
 
-  // ── Validation ───────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────
   _validate() {
     const s = this.settings;
-    if (!s.pat) throw new Error("No GitHub PAT configured. Check plugin settings.");
-    if (!s.username) throw new Error("No GitHub username configured.");
-    if (!s.repo) throw new Error("No repository name configured.");
-    if (!s.branch) throw new Error("No branch configured.");
+    const issues = [];
+    if (!s.pat)      issues.push("Personal Access Token (PAT) is not set.");
+    if (!s.username) issues.push("GitHub username / organisation is not set.");
+    if (!s.repo)     issues.push("Repository name is not set.");
+    if (!s.branch)   issues.push("Branch name is not set.");
+    if (issues.length > 0) {
+      throw new Error(
+        "Settings incomplete — open plugin settings to fix:\n• " +
+          issues.join("\n• ")
+      );
+    }
+    if (!/^(ghp_|github_pat_|gho_|ghs_|ghr_)/.test(s.pat)) {
+      throw new Error(
+        "PAT format looks incorrect — it should start with 'ghp_' or 'github_pat_'. " +
+          "Open plugin settings to check."
+      );
+    }
   }
 
   _client() {
@@ -357,38 +632,65 @@ class DirectGitHubSyncPlugin extends Plugin {
     return new GitHubClient(s.pat, s.username, s.repo, s.branch);
   }
 
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   //  PUSH  (Local → GitHub)
-  // ─────────────────────────────────────────
-  async push() {
+  // ─────────────────────────────────────────────────────────────────────
+  /**
+   * @param {boolean} [forcePush=false]  Skip the conflict check and push anyway.
+   */
+  async push(forcePush = false) {
     try {
       this._validate();
     } catch (e) {
-      new Notice(e.message, 6000);
+      new Notice(e.message, 8000);
       return;
     }
 
     const client = this._client();
     const concurrency = this.settings.concurrency || 5;
-    const status = new Notice("Push: connecting...", 0);
+    const status = new Notice("Push: connecting…", 0);
 
     try {
-      // 0. Ensure branch exists
+      // 0. Bootstrap empty repo if needed
       const initialised = await client.initRepoIfNeeded();
-      if (initialised) status.setMessage("Push: initialised empty repository.");
+      if (initialised) {
+        status.setMessage("Push: initialised empty repository.");
+        await sleep(800);
+      }
 
-      // 1. Fetch remote tree and scan local files IN PARALLEL
-      //    — network round-trip and disk reads overlap
-      status.setMessage("Push: reading local and remote state...");
-
+      // 1. Fetch remote commit + local file list concurrently
+      status.setMessage("Push: reading local and remote state…");
       const [{ commitSha, treeSha }, allFiles] = await Promise.all([
         client.getLatestCommit(),
         Promise.resolve(this.app.vault.getFiles()),
       ]);
 
+      // ── Conflict detection ────────────────────────────────────────────
+      // If we have a remembered remote commit and it doesn't match what's
+      // on the remote right now, someone else pushed while we weren't looking.
+      if (
+        !forcePush &&
+        this.settings.lastKnownRemoteCommit &&
+        this.settings.lastKnownRemoteCommit !== commitSha
+      ) {
+        status.hide();
+        // Show the modal; push(true) is called if user forces through
+        new ConflictModal(
+          this.app,
+          commitSha,
+          () => this.push(true),
+          () =>
+            new Notice(
+              "Push cancelled. Pull first to get the latest remote changes, then push.",
+              6000
+            )
+        ).open();
+        return;
+      }
+
+      // Start fetching the remote tree while we filter local files
       const remoteTreePromise = client.getFullTree(treeSha);
 
-      // Filter local files while remote tree is still fetching
       const files = allFiles.filter((f) => {
         const p = normalisePath(f.path);
         if (p === ".gitkeep") return false;
@@ -404,10 +706,9 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // Read all local files + compute their Git blob SHAs in parallel
-      // while the remote tree fetch is also in flight
-      status.setMessage(`Push: scanning ${files.length} local file(s)...`);
-      const [remoteTree, localEntries] = await Promise.all([
+      // 2. Hash local files and fetch remote tree in parallel
+      status.setMessage(`Push: scanning ${files.length} local file(s)…`);
+      const [remoteTree, hashResults] = await Promise.all([
         remoteTreePromise,
         parallelBatch(files, concurrency, async (file) => {
           const buf = await this.app.vault.readBinary(file);
@@ -416,150 +717,270 @@ class DirectGitHubSyncPlugin extends Plugin {
         }),
       ]);
 
-      // Build remote SHA map
+      // Report files we couldn't read
+      const hashFailed = hashResults.filter((r) => !r.ok);
+      const localEntries = hashResults.filter((r) => r.ok).map((r) => r.value);
+
+      if (hashFailed.length > 0) {
+        const names = hashFailed
+          .map((r) => r.item?.path || "unknown")
+          .join(", ");
+        console.warn(
+          `[Direct GitHub Sync] Skipped ${hashFailed.length} unreadable file(s): ${names}`
+        );
+        new Notice(
+          `⚠️ ${hashFailed.length} file(s) could not be read and will be skipped:\n${names}`,
+          8000
+        );
+      }
+
+      // Build remote SHA lookup
       const remoteShaMap = {};
       for (const node of remoteTree) {
         if (node.type === "blob") remoteShaMap[node.path] = node.sha;
       }
 
-      // 2. Diff — pure CPU, instant
-      const changed = localEntries.filter((e) => remoteShaMap[e.path] !== e.sha);
+      // 3. Diff — pure CPU, zero API calls
+      const localPaths = new Set(localEntries.map((e) => e.path));
+      const changed   = localEntries.filter((e) => remoteShaMap[e.path] !== e.sha);
       const unchanged = localEntries.filter((e) => remoteShaMap[e.path] === e.sha);
 
-      if (changed.length === 0) {
+      // ── Deletion sync (push) ──────────────────────────────────────────
+      // Remote files that no longer exist locally should be removed from the repo.
+      const toDeleteRemotely = Object.keys(remoteShaMap).filter((rPath) => {
+        if (rPath === ".gitkeep") return false;
+        if (
+          this.settings.ignoreObsidianDir &&
+          (rPath.startsWith(".obsidian/") || rPath === ".obsidian")
+        )
+          return false;
+        return !localPaths.has(rPath);
+      });
+
+      if (changed.length === 0 && toDeleteRemotely.length === 0) {
         status.setMessage("Push: already up to date — nothing changed.");
+        // Still update the known-commit so future conflict detection is accurate
+        this.settings.lastKnownRemoteCommit = commitSha;
+        await this.saveSettings();
         setTimeout(() => status.hide(), 4000);
         return;
       }
 
-      // 3. Upload changed blobs in parallel
+      // 4. Upload changed blobs in parallel
       let uploaded = 0;
-      status.setMessage(`Push: uploading ${changed.length} changed file(s)...`);
+      if (changed.length > 0) {
+        status.setMessage(`Push: uploading ${changed.length} changed file(s)…`);
+      }
 
-      const uploadedEntries = await parallelBatch(changed, concurrency, async (f) => {
-        const b64 = arrayBufferToBase64(f.buf);
-        let blobSha;
-        try {
-          blobSha = await client.createBlob(b64);
-        } catch (e) {
-          throw new Error(`Blob upload failed for "${f.path}": ${e.message}`);
+      const uploadResults = await parallelBatch(
+        changed,
+        concurrency,
+        async (f) => {
+          const b64 = arrayBufferToBase64(f.buf);
+          const blobSha = await client.createBlob(b64); // createBlob already retries
+          uploaded++;
+          status.setMessage(`Push: uploaded ${uploaded} / ${changed.length}…`);
+          return { path: f.path, sha: blobSha };
         }
-        uploaded++;
-        status.setMessage(`Push: uploaded ${uploaded} / ${changed.length}...`);
-        return { path: f.path, sha: blobSha };
-      });
+      );
 
-      // 4. Build tree items — reuse existing SHAs for unchanged files
+      const uploadFailed  = uploadResults.filter((r) => !r.ok);
+      const uploadedEntries = uploadResults.filter((r) => r.ok).map((r) => r.value);
+
+      if (uploadFailed.length > 0) {
+        const names = uploadFailed
+          .map((r) => r.item?.path || "unknown")
+          .join(", ");
+        console.warn(
+          `[Direct GitHub Sync] Upload failed for: ${names}`
+        );
+        new Notice(
+          `⚠️ ${uploadFailed.length} file(s) failed to upload and were skipped:\n${names}`,
+          8000
+        );
+      }
+
+      // 5. Build the tree: unchanged files + newly uploaded files
       const treeItems = [
         ...unchanged.map((f) => ({
-          path: f.path, mode: "100644", type: "blob", sha: remoteShaMap[f.path],
+          path: f.path,
+          mode: "100644",
+          type: "blob",
+          sha: remoteShaMap[f.path],
         })),
         ...uploadedEntries.map((f) => ({
-          path: f.path, mode: "100644", type: "blob", sha: f.sha,
+          path: f.path,
+          mode: "100644",
+          type: "blob",
+          sha: f.sha,
         })),
       ];
 
-      // 5. Commit
-      status.setMessage("Push: creating commit...");
-      const newTreeSha = await client.createTree(treeSha, treeItems)
-        .catch((e) => { throw new Error(`Tree creation failed: ${e.message}`); });
+      // 6. Create tree (with deletions), commit, and update ref
+      const deletionMsg =
+        toDeleteRemotely.length > 0
+          ? ` (removing ${toDeleteRemotely.length} deleted file(s))`
+          : "";
+      status.setMessage(`Push: creating commit${deletionMsg}…`);
+
+      const newTreeSha = await client
+        .createTree(treeSha, treeItems, toDeleteRemotely)
+        .catch((e) => {
+          throw new Error(`Tree creation failed: ${e.message}`);
+        });
 
       const msg = buildCommitMessage(this.settings.deviceName);
-      const newCommitSha = await client.createCommit(msg, newTreeSha, commitSha)
-        .catch((e) => { throw new Error(`Commit creation failed: ${e.message}`); });
+      const newCommitSha = await client
+        .createCommit(msg, newTreeSha, commitSha)
+        .catch((e) => {
+          throw new Error(`Commit creation failed: ${e.message}`);
+        });
 
-      status.setMessage("Push: updating branch ref...");
-      await client.updateRef(newCommitSha)
-        .catch((e) => { throw new Error(`Commit created (${newCommitSha}) but ref update failed: ${e.message}`); });
+      status.setMessage("Push: updating branch ref…");
+      await client.updateRef(newCommitSha).catch((e) => {
+        throw new Error(
+          `Commit created (${newCommitSha.slice(0, 8)}) but ref update failed: ${
+            e.message
+          }`
+        );
+      });
 
-      // 6. Sync cache — prime pull cache with final SHAs so next pull is instant
-      const cache = this.settings.lastPulledShas || {};
-      for (const item of treeItems) cache[item.path] = item.sha;
-      this.settings.lastPulledShas = cache;
+      // 7. Update cache only after the entire operation succeeds
+      const newCache = {};
+      for (const item of treeItems) newCache[item.path] = item.sha;
+      // Strip deleted paths from the cache
+      for (const dp of toDeleteRemotely) delete newCache[dp];
+
+      this.settings.lastPulledShas = newCache;
+      this.settings.lastKnownRemoteCommit = newCommitSha;
       await this.saveSettings();
 
-      const skippedMsg = unchanged.length > 0 ? ` (${unchanged.length} unchanged, skipped)` : "";
-      status.setMessage(`Push complete — ${changed.length} file(s) uploaded.${skippedMsg}`);
-      setTimeout(() => status.hide(), 5000);
+      // Build summary message
+      const summary = [];
+      if (uploadedEntries.length > 0) summary.push(`${uploadedEntries.length} uploaded`);
+      if (toDeleteRemotely.length > 0) summary.push(`${toDeleteRemotely.length} deleted remotely`);
+      if (unchanged.length > 0) summary.push(`${unchanged.length} unchanged`);
+
+      const warnings = [];
+      if (uploadFailed.length > 0) warnings.push(`${uploadFailed.length} upload failed`);
+      if (hashFailed.length > 0) warnings.push(`${hashFailed.length} unreadable`);
+      const warnStr =
+        warnings.length > 0 ? `  ⚠️ ${warnings.join(", ")}` : "";
+
+      status.setMessage(`Push complete — ${summary.join(", ")}.${warnStr}`);
+      setTimeout(() => status.hide(), 6000);
     } catch (e) {
       console.error("[Direct GitHub Sync] Push error:", e);
       status.setMessage(`Push failed: ${e.message}`);
-      setTimeout(() => status.hide(), 10000);
+      setTimeout(() => status.hide(), 12000);
     }
   }
 
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   //  PULL  (GitHub → Local)
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
   async pull() {
     try {
       this._validate();
     } catch (e) {
-      new Notice(e.message, 6000);
+      new Notice(e.message, 8000);
       return;
     }
 
     const client = this._client();
     const concurrency = this.settings.concurrency || 5;
-    const status = new Notice("Pull: connecting...", 0);
+    const status = new Notice("Pull: connecting…", 0);
 
     try {
-      // 1. Fetch remote tree
-      status.setMessage("Pull: fetching repository tree...");
-      const { treeSha } = await client.getLatestCommit();
+      // 1. Fetch latest remote state
+      status.setMessage("Pull: fetching repository state…");
+      const { commitSha, treeSha } = await client.getLatestCommit();
       const tree = await client.getFullTree(treeSha);
 
       const folders = tree.filter((n) => n.type === "tree");
       const blobs = tree.filter((n) => {
         const p = normalisePath(n.path);
         if (p === ".gitkeep") return false;
-        if (this.settings.ignoreObsidianDir &&
-            (p.startsWith(".obsidian/") || p === ".obsidian")) return false;
+        if (
+          this.settings.ignoreObsidianDir &&
+          (p.startsWith(".obsidian/") || p === ".obsidian")
+        )
+          return false;
         return n.type === "blob";
       });
 
       // 2. Delta check — only download what actually changed
       const cache = this.settings.lastPulledShas || {};
-      const changed = blobs.filter((n) => cache[normalisePath(n.path)] !== n.sha);
+      const changed = blobs.filter(
+        (n) => cache[normalisePath(n.path)] !== n.sha
+      );
 
-      if (changed.length === 0) {
+      // ── Deletion sync (pull) ──────────────────────────────────────────
+      // Paths in our cache that no longer appear in the remote tree were
+      // deleted remotely — remove them locally too.
+      const remotePathSet = new Set(
+        blobs.map((n) => normalisePath(n.path))
+      );
+      const toDeleteLocally = Object.keys(cache).filter((cachedPath) => {
+        if (cachedPath === ".gitkeep") return false;
+        if (
+          this.settings.ignoreObsidianDir &&
+          (cachedPath.startsWith(".obsidian/") ||
+            cachedPath === ".obsidian")
+        )
+          return false;
+        return !remotePathSet.has(cachedPath);
+      });
+
+      if (changed.length === 0 && toDeleteLocally.length === 0) {
         status.setMessage("Pull: already up to date.");
+        this.settings.lastKnownRemoteCommit = commitSha;
+        await this.saveSettings();
         setTimeout(() => status.hide(), 4000);
         return;
       }
 
-      // 3. Ensure all folders exist — serial but instant (local FS only)
+      // 3. Ensure folders exist locally
       for (const folder of folders) {
         const fp = normalisePath(folder.path);
-        if (this.settings.ignoreObsidianDir &&
-            (fp.startsWith(".obsidian/") || fp === ".obsidian")) continue;
+        if (
+          this.settings.ignoreObsidianDir &&
+          (fp.startsWith(".obsidian/") || fp === ".obsidian")
+        )
+          continue;
         if (!this.app.vault.getAbstractFileByPath(fp)) {
-          try { await this.app.vault.createFolder(fp); } catch { /* already exists */ }
+          try {
+            await this.app.vault.createFolder(fp);
+          } catch {
+            /* already exists — safe to ignore */
+          }
         }
       }
 
       // 4. Download changed blobs in parallel
-      status.setMessage(`Pull: downloading ${changed.length} changed file(s)...`);
+      if (changed.length > 0) {
+        status.setMessage(
+          `Pull: downloading ${changed.length} changed file(s)…`
+        );
+      }
+
       let written = 0;
       const newCache = Object.assign({}, cache);
 
-      await parallelBatch(changed, concurrency, async (node) => {
-        const fp = normalisePath(node.path);
-        let b64;
-        try {
-          b64 = await client.getBlob(node.sha);
-        } catch (e) {
-          console.warn(`[Direct GitHub Sync] Blob fetch failed for "${fp}": ${e.message}`);
-          return; // skip this file, don't update cache — will retry next pull
-        }
+      const downloadResults = await parallelBatch(
+        changed,
+        concurrency,
+        async (node) => {
+          const fp = normalisePath(node.path);
+          // getBlob already retries internally
+          const b64 = await client.getBlob(node.sha);
+          const buf = base64ToArrayBuffer(b64);
+          const existing = this.app.vault.getAbstractFileByPath(fp);
 
-        const buf = base64ToArrayBuffer(b64);
-        const existing = this.app.vault.getAbstractFileByPath(fp);
-
-        try {
           if (existing) {
             await this.app.vault.adapter.writeBinary(fp, buf);
           } else {
+            // Create missing parent folders on the fly
             const parts = fp.split("/");
             if (parts.length > 1) {
               const dir = parts.slice(0, -1).join("/");
@@ -569,26 +990,92 @@ class DirectGitHubSyncPlugin extends Plugin {
             }
             await this.app.vault.createBinary(fp, buf);
           }
-          newCache[fp] = node.sha;
           written++;
-          status.setMessage(`Pull: downloaded ${written} / ${changed.length}...`);
-        } catch (e) {
-          console.warn(`[Direct GitHub Sync] Write failed for "${fp}": ${e.message}`);
+          status.setMessage(
+            `Pull: downloaded ${written} / ${changed.length}…`
+          );
+          return { path: fp, sha: node.sha };
         }
-      });
+      );
 
-      // 5. Persist cache
+      const downloadFailed   = downloadResults.filter((r) => !r.ok);
+      const downloadedEntries = downloadResults.filter((r) => r.ok).map((r) => r.value);
+
+      // Update cache only for files we successfully wrote
+      for (const entry of downloadedEntries) {
+        newCache[entry.path] = entry.sha;
+      }
+
+      if (downloadFailed.length > 0) {
+        const names = downloadFailed
+          .map((r) => (r.item ? normalisePath(r.item.path) : "unknown"))
+          .join(", ");
+        console.warn(
+          `[Direct GitHub Sync] Download/write failed for: ${names}`
+        );
+        new Notice(
+          `⚠️ ${downloadFailed.length} file(s) failed to download — they will retry on the next pull:\n${names}`,
+          8000
+        );
+      }
+
+      // 5. Delete locally files that were removed on remote
+      let deleted = 0;
+      const deleteFailed = [];
+
+      if (toDeleteLocally.length > 0) {
+        status.setMessage(
+          `Pull: removing ${toDeleteLocally.length} file(s) deleted remotely…`
+        );
+        for (const fp of toDeleteLocally) {
+          try {
+            const existing = this.app.vault.getAbstractFileByPath(fp);
+            if (existing) {
+              await this.app.vault.trash(existing, true);
+            }
+            delete newCache[fp];
+            deleted++;
+          } catch (e) {
+            console.warn(
+              `[Direct GitHub Sync] Could not delete local file "${fp}": ${e.message}`
+            );
+            deleteFailed.push(fp);
+          }
+        }
+        if (deleteFailed.length > 0) {
+          new Notice(
+            `⚠️ ${deleteFailed.length} file(s) could not be deleted locally:\n${deleteFailed.join(", ")}`,
+            8000
+          );
+        }
+      }
+
+      // 6. Persist cache after full operation
       this.settings.lastPulledShas = newCache;
+      this.settings.lastKnownRemoteCommit = commitSha;
       await this.saveSettings();
 
+      // Build summary
+      const summary = [];
+      if (written > 0) summary.push(`${written} downloaded`);
+      if (deleted > 0) summary.push(`${deleted} deleted locally`);
       const skipped = blobs.length - changed.length;
-      const skippedMsg = skipped > 0 ? ` (${skipped} unchanged, skipped)` : "";
-      status.setMessage(`Pull complete — ${written} file(s) updated.${skippedMsg}`);
-      setTimeout(() => status.hide(), 5000);
+      if (skipped > 0) summary.push(`${skipped} unchanged`);
+
+      const warnings = [];
+      if (downloadFailed.length > 0) warnings.push(`${downloadFailed.length} download failed`);
+      if (deleteFailed.length > 0) warnings.push(`${deleteFailed.length} delete failed`);
+      const warnStr =
+        warnings.length > 0 ? `  ⚠️ ${warnings.join(", ")}` : "";
+
+      status.setMessage(
+        `Pull complete — ${summary.join(", ")}.${warnStr}`
+      );
+      setTimeout(() => status.hide(), 6000);
     } catch (e) {
       console.error("[Direct GitHub Sync] Pull error:", e);
       status.setMessage(`Pull failed: ${e.message}`);
-      setTimeout(() => status.hide(), 10000);
+      setTimeout(() => status.hide(), 12000);
     }
   }
 }
@@ -601,87 +1088,152 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this._draft = {};
+    this._validationEl = null;
+    this._saveBtn = null;
+  }
+
+  /** Clone current saved values into the unsaved draft. */
+  _initDraft() {
+    const s = this.plugin.settings;
+    this._draft = {
+      pat:      s.pat,
+      username: s.username,
+      repo:     s.repo,
+      branch:   s.branch,
+    };
+  }
+
+  /** True if the draft differs from what's already saved. */
+  _isDirty() {
+    const s = this.plugin.settings;
+    return (
+      this._draft.pat      !== s.pat      ||
+      this._draft.username !== s.username ||
+      this._draft.repo     !== s.repo     ||
+      this._draft.branch   !== s.branch
+    );
   }
 
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    this._initDraft();
 
-    // ── Header ───────────────────────────────
+    // ── Header ─────────────────────────────────────────────────────────
     containerEl.createEl("h2", { text: "Direct GitHub Sync" });
     containerEl.createEl("p", {
-      text: "Sync your vault directly with a GitHub repository using the GitHub REST API — no Git, no Node.js, works on mobile.",
+      text:
+        "Sync your vault directly with a GitHub repository using the GitHub REST API — no Git, no Node.js, works on mobile.",
       cls: "setting-item-description",
     });
 
-    // ── Section: Authentication ───────────────
-    containerEl.createEl("h3", { text: "Authentication" });
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 1 — Authentication & Repository
+    // ══════════════════════════════════════════════════════════════════
+    containerEl.createEl("h3", { text: "🔑 Authentication & Repository" });
 
+    const authNote = containerEl.createEl("p", {
+      cls: "setting-item-description dgs-section-note",
+    });
+    authNote.innerHTML =
+      "These settings are only applied when you click " +
+      "<strong>Save Connection Settings</strong>. " +
+      "Unsaved changes will not be used by Push or Pull.";
+
+    // PAT
     new Setting(containerEl)
       .setName("Personal Access Token (PAT)")
       .setDesc(
-        "A GitHub PAT with 'repo' scope. Generate one at GitHub → Settings → Developer settings → Personal access tokens."
+        "A GitHub PAT with 'repo' scope (or 'Contents: Read & Write' for fine-grained tokens). " +
+          "Generate one at GitHub → Settings → Developer settings → Personal access tokens."
       )
       .addText((text) => {
         text.inputEl.type = "password";
+        text.inputEl.autocomplete = "off";
         text
           .setPlaceholder("ghp_xxxxxxxxxxxxxxxxxxxx")
-          .setValue(this.plugin.settings.pat)
-          .onChange(async (v) => {
-            this.plugin.settings.pat = v.trim();
-            await this.plugin.saveSettings();
+          .setValue(this._draft.pat)
+          .onChange((v) => {
+            this._draft.pat = v.trim();
+            this._updateSaveBtnState();
           });
       });
 
-    // ── Section: Repository ───────────────────
-    containerEl.createEl("h3", { text: "Repository" });
-
+    // Username
     new Setting(containerEl)
-      .setName("GitHub Username / Org")
-      .setDesc("The owner of the target repository.")
+      .setName("GitHub Username / Organisation")
+      .setDesc(
+        "The account or organisation that owns the target repository."
+      )
       .addText((text) =>
         text
           .setPlaceholder("octocat")
-          .setValue(this.plugin.settings.username)
-          .onChange(async (v) => {
-            this.plugin.settings.username = v.trim();
-            await this.plugin.saveSettings();
+          .setValue(this._draft.username)
+          .onChange((v) => {
+            this._draft.username = v.trim();
+            this._updateSaveBtnState();
           })
       );
 
+    // Repo name
     new Setting(containerEl)
       .setName("Repository Name")
-      .setDesc("The name of the repository (not the full URL).")
+      .setDesc("The repository name only — not a URL.")
       .addText((text) =>
         text
           .setPlaceholder("my-obsidian-vault")
-          .setValue(this.plugin.settings.repo)
-          .onChange(async (v) => {
-            this.plugin.settings.repo = v.trim();
-            await this.plugin.saveSettings();
+          .setValue(this._draft.repo)
+          .onChange((v) => {
+            this._draft.repo = v.trim();
+            this._updateSaveBtnState();
           })
       );
 
+    // Branch
     new Setting(containerEl)
       .setName("Branch")
-      .setDesc("Target branch. Defaults to 'main'.")
+      .setDesc("Target branch. Leave blank to use 'main'.")
       .addText((text) =>
         text
           .setPlaceholder("main")
-          .setValue(this.plugin.settings.branch)
-          .onChange(async (v) => {
-            this.plugin.settings.branch = v.trim() || "main";
-            await this.plugin.saveSettings();
+          .setValue(this._draft.branch)
+          .onChange((v) => {
+            this._draft.branch = v.trim() || "main";
+            this._updateSaveBtnState();
           })
       );
 
-    // ── Section: Behaviour ────────────────────
-    containerEl.createEl("h3", { text: "Behaviour" });
+    // Validation result panel
+    this._validationEl = containerEl.createDiv({
+      cls: "dgs-validation-result dgs-hidden",
+    });
+
+    // Save + Test buttons
+    const actionSetting = new Setting(containerEl);
+    actionSetting
+      .addButton((btn) => {
+        this._saveBtn = btn;
+        btn
+          .setButtonText("Save Connection Settings")
+          .setCta()
+          .onClick(() => this._saveCredentials());
+      })
+      .addButton((btn) =>
+        btn.setButtonText("Test Connection").onClick(() =>
+          this._testConnection()
+        )
+      );
+
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 2 — Behaviour
+    // ══════════════════════════════════════════════════════════════════
+    containerEl.createEl("h3", { text: "⚙️ Behaviour" });
 
     new Setting(containerEl)
       .setName("Ignore .obsidian directory")
       .setDesc(
-        "Recommended. Prevents plugin configs, workspace state, and cache files from being pushed to or overwritten by GitHub."
+        "Recommended. Prevents plugin configs, workspace state, and cache from being pushed to or pulled from GitHub."
       )
       .addToggle((toggle) =>
         toggle
@@ -695,7 +1247,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Device name (optional)")
       .setDesc(
-        'Identifies this device in commit messages. E.g. "PC" → "Vault push from PC: 19 Apr 2026 at 14:03". Leave blank to omit.'
+        'Shown in commit messages. E.g. "PC" → "Vault push from PC: 19 Apr 2026 at 14:03". Leave blank to omit.'
       )
       .addText((text) =>
         text
@@ -710,7 +1262,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Concurrent requests")
       .setDesc(
-        "How many GitHub API requests run in parallel during push/pull. Higher is faster but may hit rate limits on slow connections. Default: 5."
+        "Number of simultaneous GitHub API calls during push/pull. Higher is faster but risks rate limits on slow connections. Default: 5."
       )
       .addSlider((slider) =>
         slider
@@ -723,12 +1275,14 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
           })
       );
 
-    // ── Section: Actions ─────────────────────
-    containerEl.createEl("h3", { text: "Quick Actions" });
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 3 — Quick Actions
+    // ══════════════════════════════════════════════════════════════════
+    containerEl.createEl("h3", { text: "⚡ Quick Actions" });
 
     new Setting(containerEl)
       .setName("Push to GitHub")
-      .setDesc("Upload all local vault files to the configured repository.")
+      .setDesc("Upload all local changes to the configured repository.")
       .addButton((btn) =>
         btn
           .setButtonText("Push Now")
@@ -739,7 +1293,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Pull from GitHub")
       .setDesc(
-        "Download all files from GitHub and overwrite local vault contents."
+        "Download all remote changes and update the local vault."
       )
       .addButton((btn) =>
         btn
@@ -748,12 +1302,129 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
           .onClick(() => this.plugin.pull())
       );
 
-    // ── Footer ────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 4 — Danger Zone
+    // ══════════════════════════════════════════════════════════════════
+    containerEl.createEl("h3", { text: "🗑️ Danger Zone" });
+
+    new Setting(containerEl)
+      .setName("Reset sync cache")
+      .setDesc(
+        "Clears the local SHA cache and remembered remote commit. " +
+          "The next push/pull will do a full sync. " +
+          "Use this if files are being skipped unexpectedly or after a manual repo reset."
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText("Reset Cache")
+          .setWarning()
+          .onClick(async () => {
+            this.plugin.settings.lastPulledShas = {};
+            this.plugin.settings.lastKnownRemoteCommit = "";
+            await this.plugin.saveSettings();
+            new Notice(
+              "Sync cache cleared. The next sync will be a full sync.",
+              5000
+            );
+          })
+      );
+
+    // ── Footer ─────────────────────────────────────────────────────────
     containerEl.createEl("hr");
     containerEl.createEl("p", {
-      text: "Tip: Assign hotkeys to 'Push to GitHub' and 'Pull from GitHub' via Settings → Hotkeys.",
+      text:
+        "Tip: Assign hotkeys to 'Push to GitHub' and 'Pull from GitHub' via Settings → Hotkeys.",
       cls: "setting-item-description",
     });
+  }
+
+  /** Update the Save button label to reflect unsaved state. */
+  _updateSaveBtnState() {
+    if (!this._saveBtn) return;
+    if (this._isDirty()) {
+      this._saveBtn.setButtonText("Save Connection Settings ●");
+    } else {
+      this._saveBtn.setButtonText("Save Connection Settings");
+    }
+  }
+
+  /** Validate the draft and commit it to plugin.settings. */
+  async _saveCredentials() {
+    const d = this._draft;
+    const issues = [];
+    if (!d.pat)      issues.push("PAT is required.");
+    if (!d.username) issues.push("GitHub username is required.");
+    if (!d.repo)     issues.push("Repository name is required.");
+    if (!d.branch)   issues.push("Branch is required.");
+    if (
+      d.pat &&
+      !/^(ghp_|github_pat_|gho_|ghs_|ghr_)/.test(d.pat)
+    ) {
+      issues.push(
+        "PAT format looks incorrect — should start with 'ghp_' or 'github_pat_'."
+      );
+    }
+
+    if (issues.length > 0) {
+      this._showValidation("error", "Cannot save:\n• " + issues.join("\n• "));
+      return;
+    }
+
+    // Commit to real settings
+    this.plugin.settings.pat      = d.pat;
+    this.plugin.settings.username = d.username;
+    this.plugin.settings.repo     = d.repo;
+    this.plugin.settings.branch   = d.branch;
+    // Clear conflict cache whenever connection details change
+    this.plugin.settings.lastKnownRemoteCommit = "";
+    await this.plugin.saveSettings();
+
+    this._updateSaveBtnState();
+    this._showValidation("ok", "Connection settings saved successfully.");
+    new Notice("✅ Connection settings saved.", 3000);
+  }
+
+  /** Run a live validation against the GitHub API. */
+  async _testConnection() {
+    if (this._isDirty()) {
+      this._showValidation(
+        "error",
+        "You have unsaved changes. Save first, then test."
+      );
+      return;
+    }
+
+    this._showValidation("info", "Testing connection…");
+    try {
+      const client = this.plugin._client();
+      const result = await client.validateSettings();
+      if (result.ok) {
+        this._showValidation("ok", result.message);
+      } else {
+        this._showValidation("error", result.message);
+      }
+    } catch (e) {
+      this._showValidation("error", `Unexpected error: ${e.message}`);
+    }
+  }
+
+  /**
+   * Show an inline result below the credential fields.
+   * @param {"ok"|"error"|"info"} type
+   * @param {string} message
+   */
+  _showValidation(type, message) {
+    const el = this._validationEl;
+    if (!el) return;
+
+    el.className = "dgs-validation-result";
+    el.removeClass("dgs-hidden");
+
+    const icons = { ok: "✅", error: "❌", info: "⏳" };
+    const cls   = { ok: "dgs-ok", error: "dgs-err", info: "dgs-info" };
+
+    el.addClass(cls[type] || "dgs-info");
+    el.setText(`${icons[type] || "ℹ️"} ${message}`);
   }
 }
 

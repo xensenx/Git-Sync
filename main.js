@@ -21,10 +21,12 @@ const DEFAULT_SETTINGS = {
   repo: "",
   branch: "main",
   ignoreObsidianDir: true,
-  commitMessage: "Manual Push from Obsidian",
-  blobDelayMs: 75,
-  // filepath -> blob SHA of the last successfully pulled state.
-  // Used to skip unchanged files on subsequent pulls.
+  deviceName: "",          // optional — shown in commit messages
+  // Max simultaneous GitHub API requests. 5 is safe and fast.
+  // Lower this if you see rate-limit errors on a slow connection.
+  concurrency: 5,
+  // filepath -> blob SHA of the last successfully pulled/pushed state.
+  // Used to skip unchanged files — never edit this manually.
   lastPulledShas: {},
 };
 
@@ -34,15 +36,32 @@ const GITHUB_API = "https://api.github.com";
 //  Helpers
 // ─────────────────────────────────────────────
 
-/** Sleep for `ms` milliseconds. */
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /**
- * Convert an ArrayBuffer to a Base64 string.
- * Works in both browser (Obsidian desktop) and mobile WebView.
+ * Run an array of async task-factory functions in a controlled concurrency pool.
+ * At most `concurrency` tasks run at the same time.
+ * Returns results in the same order as the input array.
+ *
+ * Using a pool (rather than Promise.all) avoids hammering GitHub with
+ * hundreds of simultaneous requests while still being much faster than serial.
  */
+async function parallelBatch(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let index = 0;
+
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+
+  const workers = [];
+  for (let i = 0; i < Math.min(concurrency, items.length); i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  return results;
+}
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -99,6 +118,29 @@ async function computeGitBlobSha(arrayBuffer) {
     .join("");
 }
 
+/**
+ * Build the commit message.
+ * Format: "Vault push from {device}: {date} at {time}"
+ *         "Vault push: {date} at {time}"  (when no device name set)
+ *
+ * Date: DD MMM YYYY  e.g. "19 Apr 2026"
+ * Time: HH:MM        e.g. "14:03"  (local time, 24-hour)
+ */
+function buildCommitMessage(deviceName) {
+  const now = new Date();
+
+  const months = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"];
+  const date = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+
+  const from = deviceName && deviceName.trim()
+    ? ` from ${deviceName.trim()}`
+    : "";
+
+  return `Vault push${from}: ${date} at ${time}`;
+}
+
 // ─────────────────────────────────────────────
 //  GitHub REST helpers (all use requestUrl)
 // ─────────────────────────────────────────────
@@ -137,18 +179,18 @@ class GitHubClient {
 
   // ── READ ──────────────────────────────────
 
-  /** Get the latest commit SHA and tree SHA for the branch. */
+  /** Get the latest commit SHA and tree SHA for the branch — single API call. */
   async getLatestCommit() {
+    // The Commits API returns the commit object directly, including tree SHA,
+    // saving one serial round-trip compared to ref → commit → tree.
     const data = await this._req(
       "GET",
-      `${this.base}/git/ref/heads/${this.branch}`
+      `${this.base}/commits/${this.branch}`
     );
-    const commitSha = data.object.sha;
-    const commit = await this._req(
-      "GET",
-      `${this.base}/git/commits/${commitSha}`
-    );
-    return { commitSha, treeSha: commit.tree.sha };
+    return {
+      commitSha: data.sha,
+      treeSha: data.commit.tree.sha,
+    };
   }
 
   /** Get the full recursive tree for a given tree SHA. */
@@ -215,9 +257,26 @@ class GitHubClient {
   }
 
   /**
-   * Check whether the repo is accessible. Throws a clear error if not.
+   * Ensure the branch exists and is ready. Returns false if already established,
+   * true if it just bootstrapped. Throws if the repo itself is inaccessible.
+   *
+   * We cache the "established" state in memory so repeated push/pull in the
+   * same session skips all these preflight API calls entirely.
    */
-  async checkRepoAccess() {
+  async initRepoIfNeeded() {
+    if (this._established) return false;
+
+    // Try getLatestCommit — if it works, we're done.
+    try {
+      await this.getLatestCommit();
+      this._established = true;
+      return false;
+    } catch (e) {
+      // 404 = repo not found or no branch yet; 409 = repo empty
+      if (e.status !== 404 && e.status !== 409) throw e;
+    }
+
+    // Verify the repo itself is accessible before attempting to bootstrap
     try {
       await this._req("GET", `${this.base}`);
     } catch {
@@ -225,57 +284,16 @@ class GitHubClient {
         `Repository "${this.username}/${this.repo}" not found or PAT lacks access.`
       );
     }
-  }
 
-  /**
-   * Returns true if the branch has at least one commit, false if it is
-   * completely empty (no refs at all — freshly created repo).
-   */
-  async branchExists() {
-    try {
-      // Use the Commits API — safer than the Git Database ref endpoint
-      // on repos that have never had a commit.
-      const resp = await requestUrl({
-        url: `${this.base}/commits?sha=${this.branch}&per_page=1`,
-        method: "GET",
-        headers: this._headers,
-      });
-      // 409 = repo exists but has no commits yet
-      if (resp.status === 409) return false;
-      if (resp.status === 404) return false;
-      if (resp.status >= 400) return false;
-      return Array.isArray(resp.json) && resp.json.length > 0;
-    } catch {
-      return false;
-    }
-  }
+    // Bootstrap: Contents API is the only reliable way to seed a zero-commit repo
+    await this._req("PUT", `${this.base}/contents/.gitkeep`, {
+      message: "Initial commit (Direct GitHub Sync)",
+      content: btoa(""),
+      branch: this.branch,
+    });
 
-  /**
-   * Bootstrap a completely empty repo by pushing a placeholder file via
-   * the Contents API — the only reliable way to initialise a repo with
-   * zero commits through the REST API.
-   */
-  async bootstrapEmptyRepo() {
-    await this._req(
-      "PUT",
-      `${this.base}/contents/.gitkeep`,
-      {
-        message: "Initial commit (Direct GitHub Sync)",
-        content: btoa(""), // empty file, base64
-        branch: this.branch,
-      }
-    );
-  }
-
-  /**
-   * Initialise the repository if the branch does not yet exist.
-   */
-  async initRepoIfNeeded() {
-    await this.checkRepoAccess();
-    const exists = await this.branchExists();
-    if (exists) return false;
-    await this.bootstrapEmptyRepo();
-    return true; // bootstrapped
+    this._established = true;
+    return true;
   }
 }
 
@@ -351,28 +369,26 @@ class DirectGitHubSyncPlugin extends Plugin {
     }
 
     const client = this._client();
+    const concurrency = this.settings.concurrency || 5;
     const status = new Notice("Push: connecting...", 0);
 
     try {
       // 0. Ensure branch exists
       const initialised = await client.initRepoIfNeeded();
-      if (initialised) {
-        status.setMessage("Push: initialised empty repository.");
-      }
+      if (initialised) status.setMessage("Push: initialised empty repository.");
 
-      // 1. Fetch remote tree — one API call gives us every file's blob SHA
-      status.setMessage("Push: reading remote state...");
-      const { commitSha, treeSha } = await client.getLatestCommit();
-      const remoteTree = await client.getFullTree(treeSha);
+      // 1. Fetch remote tree and scan local files IN PARALLEL
+      //    — network round-trip and disk reads overlap
+      status.setMessage("Push: reading local and remote state...");
 
-      // Build a map of remotePath -> remoteBlobSha for O(1) lookup
-      const remoteShaMap = {};
-      for (const node of remoteTree) {
-        if (node.type === "blob") remoteShaMap[node.path] = node.sha;
-      }
+      const [{ commitSha, treeSha }, allFiles] = await Promise.all([
+        client.getLatestCommit(),
+        Promise.resolve(this.app.vault.getFiles()),
+      ]);
 
-      // 2. Gather local files
-      const allFiles = this.app.vault.getFiles();
+      const remoteTreePromise = client.getFullTree(treeSha);
+
+      // Filter local files while remote tree is still fetching
       const files = allFiles.filter((f) => {
         const p = normalisePath(f.path);
         if (p === ".gitkeep") return false;
@@ -388,23 +404,27 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // 3. Compute local SHAs and diff against remote — no API calls yet
-      status.setMessage("Push: scanning for changes...");
-      const changed = [];
-      const unchanged = [];
+      // Read all local files + compute their Git blob SHAs in parallel
+      // while the remote tree fetch is also in flight
+      status.setMessage(`Push: scanning ${files.length} local file(s)...`);
+      const [remoteTree, localEntries] = await Promise.all([
+        remoteTreePromise,
+        parallelBatch(files, concurrency, async (file) => {
+          const buf = await this.app.vault.readBinary(file);
+          const sha = await computeGitBlobSha(buf);
+          return { path: normalisePath(file.path), sha, buf };
+        }),
+      ]);
 
-      for (const file of files) {
-        const filePath = normalisePath(file.path);
-        const buf = await this.app.vault.readBinary(file);
-        const localSha = await computeGitBlobSha(buf);
-
-        if (remoteShaMap[filePath] === localSha) {
-          // File is byte-for-byte identical to remote — reuse remote SHA
-          unchanged.push({ path: filePath, sha: localSha, buf: null });
-        } else {
-          changed.push({ path: filePath, sha: null, buf });
-        }
+      // Build remote SHA map
+      const remoteShaMap = {};
+      for (const node of remoteTree) {
+        if (node.type === "blob") remoteShaMap[node.path] = node.sha;
       }
+
+      // 2. Diff — pure CPU, instant
+      const changed = localEntries.filter((e) => remoteShaMap[e.path] !== e.sha);
+      const unchanged = localEntries.filter((e) => remoteShaMap[e.path] === e.sha);
 
       if (changed.length === 0) {
         status.setMessage("Push: already up to date — nothing changed.");
@@ -412,65 +432,49 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // 4. Upload blobs only for changed files
-      const treeItems = [];
+      // 3. Upload changed blobs in parallel
+      let uploaded = 0;
+      status.setMessage(`Push: uploading ${changed.length} changed file(s)...`);
 
-      // Unchanged files: reference their existing remote SHA directly —
-      // no upload needed, GitHub reuses the blob
-      for (const f of unchanged) {
-        treeItems.push({ path: f.path, mode: "100644", type: "blob", sha: remoteShaMap[f.path] });
-      }
-
-      // Changed files: upload new blobs
-      for (let i = 0; i < changed.length; i++) {
-        const f = changed[i];
-        status.setMessage(`Push: uploading ${i + 1} / ${changed.length} changed file(s) — ${f.path}`);
-
+      const uploadedEntries = await parallelBatch(changed, concurrency, async (f) => {
+        const b64 = arrayBufferToBase64(f.buf);
         let blobSha;
         try {
-          const b64 = arrayBufferToBase64(f.buf);
           blobSha = await client.createBlob(b64);
         } catch (e) {
           throw new Error(`Blob upload failed for "${f.path}": ${e.message}`);
         }
+        uploaded++;
+        status.setMessage(`Push: uploaded ${uploaded} / ${changed.length}...`);
+        return { path: f.path, sha: blobSha };
+      });
 
-        treeItems.push({ path: f.path, mode: "100644", type: "blob", sha: blobSha });
+      // 4. Build tree items — reuse existing SHAs for unchanged files
+      const treeItems = [
+        ...unchanged.map((f) => ({
+          path: f.path, mode: "100644", type: "blob", sha: remoteShaMap[f.path],
+        })),
+        ...uploadedEntries.map((f) => ({
+          path: f.path, mode: "100644", type: "blob", sha: f.sha,
+        })),
+      ];
 
-        if (i < changed.length - 1) {
-          await sleep(this.settings.blobDelayMs);
-        }
-      }
-
-      // 5. New tree, commit, ref update
+      // 5. Commit
       status.setMessage("Push: creating commit...");
-      let newTreeSha;
-      try {
-        newTreeSha = await client.createTree(treeSha, treeItems);
-      } catch (e) {
-        throw new Error(`Tree creation failed: ${e.message}`);
-      }
+      const newTreeSha = await client.createTree(treeSha, treeItems)
+        .catch((e) => { throw new Error(`Tree creation failed: ${e.message}`); });
 
-      let newCommitSha;
-      try {
-        const msg = this.settings.commitMessage || DEFAULT_SETTINGS.commitMessage;
-        newCommitSha = await client.createCommit(msg, newTreeSha, commitSha);
-      } catch (e) {
-        throw new Error(`Commit creation failed: ${e.message}`);
-      }
+      const msg = buildCommitMessage(this.settings.deviceName);
+      const newCommitSha = await client.createCommit(msg, newTreeSha, commitSha)
+        .catch((e) => { throw new Error(`Commit creation failed: ${e.message}`); });
 
       status.setMessage("Push: updating branch ref...");
-      try {
-        await client.updateRef(newCommitSha);
-      } catch (e) {
-        throw new Error(`Commit created (${newCommitSha}) but ref update failed: ${e.message}`);
-      }
+      await client.updateRef(newCommitSha)
+        .catch((e) => { throw new Error(`Commit created (${newCommitSha}) but ref update failed: ${e.message}`); });
 
-      // 6. Update the pull cache so a subsequent pull on this device
-      //    correctly sees these files as already up to date
+      // 6. Sync cache — prime pull cache with final SHAs so next pull is instant
       const cache = this.settings.lastPulledShas || {};
-      for (const item of treeItems) {
-        cache[item.path] = item.sha;
-      }
+      for (const item of treeItems) cache[item.path] = item.sha;
       this.settings.lastPulledShas = cache;
       await this.saveSettings();
 
@@ -496,27 +500,27 @@ class DirectGitHubSyncPlugin extends Plugin {
     }
 
     const client = this._client();
+    const concurrency = this.settings.concurrency || 5;
     const status = new Notice("Pull: connecting...", 0);
 
     try {
-      // 1. Latest commit & recursive tree
+      // 1. Fetch remote tree
       status.setMessage("Pull: fetching repository tree...");
       const { treeSha } = await client.getLatestCommit();
       const tree = await client.getFullTree(treeSha);
 
       const folders = tree.filter((n) => n.type === "tree");
-      const blobs  = tree.filter((n) => n.type === "blob").filter((n) => {
+      const blobs = tree.filter((n) => {
         const p = normalisePath(n.path);
-        // Skip bootstrap artefact and .obsidian if configured
         if (p === ".gitkeep") return false;
         if (this.settings.ignoreObsidianDir &&
             (p.startsWith(".obsidian/") || p === ".obsidian")) return false;
-        return true;
+        return n.type === "blob";
       });
 
-      // 2. Delta: compare remote SHAs against our cached record
+      // 2. Delta check — only download what actually changed
       const cache = this.settings.lastPulledShas || {};
-      const changed = blobs.filter((n) => cache[n.path] !== n.sha);
+      const changed = blobs.filter((n) => cache[normalisePath(n.path)] !== n.sha);
 
       if (changed.length === 0) {
         status.setMessage("Pull: already up to date.");
@@ -524,7 +528,7 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // 3. Ensure all needed folders exist locally
+      // 3. Ensure all folders exist — serial but instant (local FS only)
       for (const folder of folders) {
         const fp = normalisePath(folder.path);
         if (this.settings.ignoreObsidianDir &&
@@ -534,22 +538,19 @@ class DirectGitHubSyncPlugin extends Plugin {
         }
       }
 
-      // 4. Download only changed files
+      // 4. Download changed blobs in parallel
+      status.setMessage(`Pull: downloading ${changed.length} changed file(s)...`);
       let written = 0;
       const newCache = Object.assign({}, cache);
 
-      for (let i = 0; i < changed.length; i++) {
-        const node = changed[i];
+      await parallelBatch(changed, concurrency, async (node) => {
         const fp = normalisePath(node.path);
-        status.setMessage(`Pull: downloading ${i + 1} / ${changed.length} — ${fp}`);
-
         let b64;
         try {
           b64 = await client.getBlob(node.sha);
         } catch (e) {
-          console.warn(`[Direct GitHub Sync] Could not fetch blob for "${fp}": ${e.message}`);
-          // Don't update cache for this file — will retry next pull
-          continue;
+          console.warn(`[Direct GitHub Sync] Blob fetch failed for "${fp}": ${e.message}`);
+          return; // skip this file, don't update cache — will retry next pull
         }
 
         const buf = base64ToArrayBuffer(b64);
@@ -559,7 +560,6 @@ class DirectGitHubSyncPlugin extends Plugin {
           if (existing) {
             await this.app.vault.adapter.writeBinary(fp, buf);
           } else {
-            // Ensure parent dir exists
             const parts = fp.split("/");
             if (parts.length > 1) {
               const dir = parts.slice(0, -1).join("/");
@@ -571,12 +571,13 @@ class DirectGitHubSyncPlugin extends Plugin {
           }
           newCache[fp] = node.sha;
           written++;
+          status.setMessage(`Pull: downloaded ${written} / ${changed.length}...`);
         } catch (e) {
-          console.warn(`[Direct GitHub Sync] Could not write "${fp}": ${e.message}`);
+          console.warn(`[Direct GitHub Sync] Write failed for "${fp}": ${e.message}`);
         }
-      }
+      });
 
-      // 5. Persist updated cache
+      // 5. Persist cache
       this.settings.lastPulledShas = newCache;
       await this.saveSettings();
 
@@ -692,31 +693,32 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Commit message")
-      .setDesc("The commit message used for every push.")
+      .setName("Device name (optional)")
+      .setDesc(
+        'Identifies this device in commit messages. E.g. "PC" → "Vault push from PC: 19 Apr 2026 at 14:03". Leave blank to omit.'
+      )
       .addText((text) =>
         text
-          .setPlaceholder("Manual Push from Obsidian")
-          .setValue(this.plugin.settings.commitMessage)
+          .setPlaceholder("e.g. PC, Phone, Laptop")
+          .setValue(this.plugin.settings.deviceName || "")
           .onChange(async (v) => {
-            this.plugin.settings.commitMessage =
-              v.trim() || DEFAULT_SETTINGS.commitMessage;
+            this.plugin.settings.deviceName = v.trim();
             await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
-      .setName("Blob upload delay (ms)")
+      .setName("Concurrent requests")
       .setDesc(
-        "Delay between individual blob upload requests during Push. Prevents GitHub secondary rate limit errors. Range: 50–500 ms."
+        "How many GitHub API requests run in parallel during push/pull. Higher is faster but may hit rate limits on slow connections. Default: 5."
       )
       .addSlider((slider) =>
         slider
-          .setLimits(50, 500, 25)
-          .setValue(this.plugin.settings.blobDelayMs)
+          .setLimits(1, 10, 1)
+          .setValue(this.plugin.settings.concurrency ?? 5)
           .setDynamicTooltip()
           .onChange(async (v) => {
-            this.plugin.settings.blobDelayMs = v;
+            this.plugin.settings.concurrency = v;
             await this.plugin.saveSettings();
           })
       );

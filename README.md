@@ -74,6 +74,10 @@ If you wish to modify the source code, the project is structured modularly and b
 
 ## Support this Project by donating
 
-<a href='https://ko-fi.com/xensenx' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi3.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+<div align="center">
+  <a href="https://ko-fi.com/xensenx" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="36" />
+  </a>
+</div>
 
 

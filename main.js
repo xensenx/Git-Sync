@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS = {
   deviceName: "",
   concurrency: 5,
   autoSyncEnabled: false,
-  autoSyncInterval: 5,    // minutes of idle before auto-sync fires
+  autoSyncInterval: 5,     // minutes of idle before smart-sync fires
   syncOnStartup: true,
   // filepath -> blob SHA of last successful sync (the "base" state)
   syncCache: {},
@@ -41,7 +41,7 @@ const DEFAULT_SETTINGS = {
 const GITHUB_API = "https://api.github.com";
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 2500;
-const MAX_SYNC_FILE_SIZE = 50 * 1024 * 1024; // 50 MB (Base64 inflates ~33% → stays under GitHub's 100 MB blob limit)
+const MAX_SYNC_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const PASSIVE_POLL_INTERVAL_MS = 120_000;     // 2 minutes
 
 // ─────────────────────────────────────────────
@@ -54,6 +54,7 @@ function sleep(ms) {
 
 /**
  * Retry wrapper.  Auth/config errors (401, 403, 404, 422) are NOT retried.
+ * Uses exponential back-off.
  */
 async function withRetry(fn, label) {
   let lastErr;
@@ -64,8 +65,8 @@ async function withRetry(fn, label) {
       if (e.status === 401 || e.status === 403 || e.status === 404 || e.status === 422) throw e;
       lastErr = e;
       if (attempt <= MAX_RETRIES) {
-        console.warn(`[DGS] "${label}" attempt ${attempt}/${MAX_RETRIES + 1} failed, retrying… (${e.message})`);
-        await sleep(RETRY_DELAY_MS);
+        console.warn(`[DGS] "${label}" attempt ${attempt}/${MAX_RETRIES + 1} failed, retrying in ${RETRY_DELAY_MS * attempt}ms… (${e.message})`);
+        await sleep(RETRY_DELAY_MS * attempt);
       }
     }
   }
@@ -85,8 +86,9 @@ async function parallelBatch(items, concurrency, fn) {
       catch (e) { results[i] = { ok: false, error: e, item: items[i] }; }
     }
   }
+  const pool = Math.max(1, Math.min(concurrency, items.length));
   const workers = [];
-  for (let w = 0; w < Math.min(concurrency, items.length); w++) workers.push(worker());
+  for (let w = 0; w < pool; w++) workers.push(worker());
   await Promise.all(workers);
   return results;
 }
@@ -107,7 +109,9 @@ function arrayBufferToBase64(buffer) {
 }
 
 function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
+  // GitHub API wraps base64 at 60 chars with newlines — strip all whitespace
+  const clean = base64.replace(/[\s]/g, "");
+  const binary = atob(clean);
   const len = binary.length;
   const bytes = new Uint8Array(len);
   const chunkSize = 8192;
@@ -123,7 +127,8 @@ function base64ToArrayBuffer(base64) {
 // ─────────────────────────────────────────────
 
 function normalisePath(p) {
-  return p.replace(/^\/+/, "").replace(/\\/g, "/");
+  // Normalise backslashes, collapse multiple slashes, strip leading slash
+  return p.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\//, "");
 }
 
 /**
@@ -145,10 +150,9 @@ async function computeGitBlobSha(arrayBuffer) {
 
 /**
  * Should this path be ignored during sync?
- * Checks .gitkeep, .obsidian toggle, and user-defined ignoredPaths.
  */
 function shouldIgnorePath(path, settings) {
-  if (path === ".gitkeep") return true;
+  if (!path || path === ".gitkeep") return true;
   if (settings.ignoreObsidianDir && (path.startsWith(".obsidian/") || path === ".obsidian")) return true;
   const rules = (settings.ignoredPaths || "")
     .split("\n")
@@ -157,21 +161,21 @@ function shouldIgnorePath(path, settings) {
   return rules.some((rule) => {
     if (rule.endsWith("/")) return path.startsWith(rule) || path + "/" === rule;
     if (rule.includes("*")) {
-      const regex = new RegExp("^" + rule.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+      const regex = new RegExp(
+        "^" + rule.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$"
+      );
       return regex.test(path);
     }
     return path === rule || path.startsWith(rule + "/");
   });
 }
 
-/**
- * Build the commit message.
- */
+/** Build the commit message. */
 function buildCommitMessage(deviceName) {
   const now = new Date();
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const date = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-  const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
   const from = deviceName && deviceName.trim() ? ` from ${deviceName.trim()}` : "";
   return `Vault sync${from}: ${date} at ${time}`;
 }
@@ -235,23 +239,32 @@ class GitHubClient {
     switch (status) {
       case 401: return "Authentication failed — your PAT is invalid or expired.";
       case 403:
-        if (ghMsg.toLowerCase().includes("rate limit")) return "GitHub rate limit exceeded. Wait a few minutes.";
+        if (ghMsg.toLowerCase().includes("rate limit"))
+          return "GitHub rate limit exceeded. Wait a few minutes and try again.";
         return "Access forbidden — PAT may lack 'repo' scope.";
       case 404:
         if (isRepo && url.includes(`/commits/${this.branch}`))
           return `Branch "${this.branch}" not found in "${this.username}/${this.repo}".`;
         if (isRepo) return `Repository "${this.username}/${this.repo}" not found.`;
         return `Resource not found (404): ${url}`;
-      case 409: return `Repository "${this.username}/${this.repo}" is empty — will be initialised automatically.`;
-      case 422: return `GitHub rejected the request (422): ${ghMsg || "check settings."}`;
-      default: return `GitHub API error (${status}): ${ghMsg || "unknown"}`;
+      case 409:
+        return `Repository "${this.username}/${this.repo}" is empty — will be initialised automatically.`;
+      case 422:
+        return `GitHub rejected the request (422): ${ghMsg || "check settings."}`;
+      default:
+        return `GitHub API error (${status}): ${ghMsg || "unknown"}`;
     }
   }
 
   // ── Read ──────────────────────────────────────
 
   async getLatestCommit() {
-    const data = await withRetry(() => this._req("GET", `${this.base}/commits/${this.branch}`), "getLatestCommit");
+    const data = await withRetry(
+      () => this._req("GET", `${this.base}/commits/${this.branch}`),
+      "getLatestCommit"
+    );
+    if (!data || !data.sha || !data.commit?.tree?.sha)
+      throw new Error("Unexpected response from GitHub when fetching latest commit.");
     return { commitSha: data.sha, treeSha: data.commit.tree.sha };
   }
 
@@ -260,13 +273,20 @@ class GitHubClient {
       () => this._req("GET", `${this.base}/git/trees/${treeSha}?recursive=1`),
       "getFullTree"
     );
-    if (data.truncated) new Notice("GitHub tree truncated (repo >100k files). Some files may be missing.", 8000);
+    if (!data || !Array.isArray(data.tree))
+      throw new Error("Unexpected response from GitHub when fetching repository tree.");
+    if (data.truncated)
+      new Notice("GitHub tree truncated (repo >100k files). Some files may be missing.", 8000);
     return data.tree;
   }
 
   async getBlob(sha) {
-    const data = await withRetry(() => this._req("GET", `${this.base}/git/blobs/${sha}`), "getBlob");
-    return data.content.replace(/\n/g, "");
+    const data = await withRetry(
+      () => this._req("GET", `${this.base}/git/blobs/${sha}`),
+      "getBlob"
+    );
+    if (!data || !data.content) throw new Error(`Empty blob response for SHA ${sha}`);
+    return data.content.replace(/[\s]/g, "");
   }
 
   // ── Write ─────────────────────────────────────
@@ -276,29 +296,41 @@ class GitHubClient {
       () => this._req("POST", `${this.base}/git/blobs`, { content: base64Content, encoding: "base64" }),
       "createBlob"
     );
+    if (!data?.sha) throw new Error("GitHub did not return a SHA for created blob.");
     return data.sha;
   }
 
   async createTree(baseTreeSha, treeItems, deletions = []) {
-    const deleteEntries = deletions.map((path) => ({ path, mode: "100644", type: "blob", sha: null }));
+    const deleteEntries = deletions.map((path) => ({
+      path, mode: "100644", type: "blob", sha: null,
+    }));
     const data = await withRetry(
-      () => this._req("POST", `${this.base}/git/trees`, { base_tree: baseTreeSha, tree: [...treeItems, ...deleteEntries] }),
+      () => this._req("POST", `${this.base}/git/trees`, {
+        base_tree: baseTreeSha,
+        tree: [...treeItems, ...deleteEntries],
+      }),
       "createTree"
     );
+    if (!data?.sha) throw new Error("GitHub did not return a SHA for created tree.");
     return data.sha;
   }
 
   async createCommit(message, treeSha, parentSha) {
     const data = await withRetry(
-      () => this._req("POST", `${this.base}/git/commits`, { message, tree: treeSha, parents: [parentSha] }),
+      () => this._req("POST", `${this.base}/git/commits`, {
+        message, tree: treeSha, parents: [parentSha],
+      }),
       "createCommit"
     );
+    if (!data?.sha) throw new Error("GitHub did not return a SHA for created commit.");
     return data.sha;
   }
 
   async updateRef(commitSha) {
     await withRetry(
-      () => this._req("PATCH", `${this.base}/git/refs/heads/${this.branch}`, { sha: commitSha, force: false }),
+      () => this._req("PATCH", `${this.base}/git/refs/heads/${this.branch}`, {
+        sha: commitSha, force: false,
+      }),
       "updateRef"
     );
   }
@@ -310,12 +342,15 @@ class GitHubClient {
       this._established = true;
       return false;
     } catch (e) {
+      // 404 = branch missing, 409 = empty repo — both are bootstrappable
       if (e.status !== 404 && e.status !== 409) throw e;
     }
+    // Verify the repo itself exists before writing to it
     try {
       await withRetry(() => this._req("GET", `${this.base}`), "check repo existence");
     } catch (e) {
-      if (e.status === 404) throw new Error(`Repository "${this.username}/${this.repo}" not found.`);
+      if (e.status === 404)
+        throw new Error(`Repository "${this.username}/${this.repo}" not found. Verify your username and repository name.`);
       throw e;
     }
     await withRetry(
@@ -341,22 +376,35 @@ class GitHubClient {
 
     const actualLogin = userResp.json?.login || "";
     if (actualLogin.toLowerCase() !== this.username.toLowerCase())
-      return { ok: false, message: `Username mismatch — PAT belongs to "${actualLogin}", settings say "${this.username}".` };
+      return {
+        ok: false,
+        message: `Username mismatch — PAT belongs to "${actualLogin}", settings say "${this.username}".`,
+      };
 
     let repoResp;
     try {
       repoResp = await requestUrl({ url: `${this.base}`, method: "GET", headers: this._headers });
     } catch { return { ok: false, message: "Network error while checking repository." }; }
 
-    if (repoResp.status === 404) return { ok: false, message: `Repository "${this.username}/${this.repo}" not found.` };
-    if (repoResp.status === 403) return { ok: false, message: `PAT doesn't have access to "${this.username}/${this.repo}".` };
+    if (repoResp.status === 404)
+      return { ok: false, message: `Repository "${this.username}/${this.repo}" not found.` };
+    if (repoResp.status === 403)
+      return { ok: false, message: `PAT does not have access to "${this.username}/${this.repo}".` };
 
     try {
-      const branchResp = await requestUrl({ url: `${this.base}/branches/${this.branch}`, method: "GET", headers: this._headers });
-      if (branchResp.status === 404) return { ok: false, message: `Branch "${this.branch}" not found.` };
-    } catch { /* empty repo — fine */ }
+      const branchResp = await requestUrl({
+        url: `${this.base}/branches/${this.branch}`,
+        method: "GET",
+        headers: this._headers,
+      });
+      if (branchResp.status === 404)
+        return { ok: false, message: `Branch "${this.branch}" not found in the repository.` };
+    } catch { /* empty repo or transient error — treat as OK */ }
 
-    return { ok: true, message: `Connected to ${this.username}/${this.repo} on branch "${this.branch}" ✓` };
+    return {
+      ok: true,
+      message: `Connected to ${this.username}/${this.repo} on branch "${this.branch}". Connection verified.`,
+    };
   }
 }
 
@@ -367,7 +415,7 @@ class GitHubClient {
 class ConflictResolutionModal extends Modal {
   constructor(app, conflicts, onResolve, onDismiss) {
     super(app);
-    this.conflicts = conflicts;   // [{ path, localSha, remoteSha, baseSha }]
+    this.conflicts = conflicts;
     this.onResolve = onResolve;
     this.onDismiss = onDismiss;
     this.resolutions = {};
@@ -383,11 +431,11 @@ class ConflictResolutionModal extends Modal {
     // Header
     const header = contentEl.createDiv({ cls: "dgs-conflict-header" });
     const iconEl = header.createSpan({ cls: "dgs-conflict-header-icon" });
-    setIcon(iconEl, "zap");
+    try { setIcon(iconEl, "git-merge"); } catch { iconEl.setText("!"); }
     header.createEl("h2", { text: "Sync Conflicts Detected" });
 
     contentEl.createEl("p", {
-      text: `${this.conflicts.length} file(s) were changed on both this device and remotely. Choose how to resolve each conflict.`,
+      text: `${this.conflicts.length} file${this.conflicts.length === 1 ? "" : "s"} changed on both this device and remotely. Choose how to resolve each conflict.`,
       cls: "dgs-conflict-subtitle",
     });
 
@@ -407,33 +455,36 @@ class ConflictResolutionModal extends Modal {
       const item = this._listEl.createDiv({ cls: "dgs-conflict-item" });
       item.dataset.path = conflict.path;
 
-      // Icon + path
       const pathRow = item.createDiv({ cls: "dgs-conflict-path-row" });
       const fIcon = pathRow.createSpan({ cls: "dgs-conflict-file-icon" });
-      setIcon(fIcon, "file-text");
+      try { setIcon(fIcon, "file-text"); } catch { fIcon.setText("F"); }
       pathRow.createSpan({ text: conflict.path, cls: "dgs-conflict-path" });
 
-      // Description
       let desc = "Modified on both devices";
       if (!conflict.localSha && conflict.remoteSha) desc = "Deleted locally, modified remotely";
       else if (conflict.localSha && !conflict.remoteSha) desc = "Modified locally, deleted remotely";
       else if (!conflict.baseSha) desc = "Created on both devices with different content";
       item.createDiv({ text: desc, cls: "dgs-conflict-desc" });
 
-      // Action buttons
       const btns = item.createDiv({ cls: "dgs-conflict-btns" });
-      const localBtn = btns.createEl("button", { text: "← Keep Local" });
+      const localBtn = btns.createEl("button", { text: "Keep Local" });
       localBtn.addClass("dgs-conflict-btn");
-      const remoteBtn = btns.createEl("button", { text: "Keep Remote →" });
+      const remoteBtn = btns.createEl("button", { text: "Keep Remote" });
       remoteBtn.addClass("dgs-conflict-btn");
       const bothBtn = btns.createEl("button", { text: "Keep Both" });
       bothBtn.addClass("dgs-conflict-btn");
 
-      localBtn.onclick = () => this._setResolution(conflict.path, "keep-local", item, { localBtn, remoteBtn, bothBtn });
-      remoteBtn.onclick = () => this._setResolution(conflict.path, "keep-remote", item, { localBtn, remoteBtn, bothBtn });
-      bothBtn.onclick = () => this._setResolution(conflict.path, "keep-both", item, { localBtn, remoteBtn, bothBtn });
+      // Disable irrelevant options
+      if (!conflict.localSha) localBtn.disabled = true;
+      if (!conflict.remoteSha) remoteBtn.disabled = true;
+      if (!conflict.localSha || !conflict.remoteSha) bothBtn.disabled = true;
 
-      item._buttons = { localBtn, remoteBtn, bothBtn };
+      const buttons = { localBtn, remoteBtn, bothBtn };
+      localBtn.onclick = () => this._setResolution(conflict.path, "keep-local", item, buttons);
+      remoteBtn.onclick = () => this._setResolution(conflict.path, "keep-remote", item, buttons);
+      bothBtn.onclick = () => this._setResolution(conflict.path, "keep-both", item, buttons);
+
+      item._buttons = buttons;
     }
 
     // Footer
@@ -459,11 +510,15 @@ class ConflictResolutionModal extends Modal {
     const items = this._listEl.querySelectorAll(".dgs-conflict-item");
     for (const item of items) {
       const path = item.dataset.path;
-      this._setResolution(path, resolution, item, item._buttons);
+      if (item._buttons) this._setResolution(path, resolution, item, item._buttons);
     }
   }
 
   _apply() {
+    if (!Object.values(this.resolutions).every((r) => r !== null)) {
+      new Notice("Resolve all conflicts before applying.", 4000);
+      return;
+    }
     this._applied = true;
     this.close();
     this.onResolve(this.resolutions);
@@ -485,6 +540,7 @@ class ConflictModal extends Modal {
     this.remoteCommitSha = remoteCommitSha;
     this.onForce = onForce;
     this.onCancel = onCancel;
+    this._decided = false;
   }
 
   onOpen() {
@@ -494,11 +550,11 @@ class ConflictModal extends Modal {
 
     const header = contentEl.createDiv({ cls: "dgs-force-header" });
     const iconEl = header.createSpan({ cls: "dgs-force-header-icon" });
-    setIcon(iconEl, "alert-triangle");
+    try { setIcon(iconEl, "alert-triangle"); } catch { iconEl.setText("!"); }
     header.createEl("h2", { text: "Remote Has Newer Commits" });
 
     contentEl.createEl("p", {
-      text: "The remote repository has commits newer than your last sync. Pushing now will overwrite those changes.",
+      text: "The remote repository has commits newer than your last sync. Pushing now will overwrite those remote changes.",
     });
     contentEl.createEl("p", {
       text: `Remote commit: ${this.remoteCommitSha.slice(0, 12)}…`,
@@ -512,13 +568,17 @@ class ConflictModal extends Modal {
     const row = contentEl.createDiv({ cls: "dgs-modal-btns" });
     const cancelBtn = row.createEl("button", { text: "Cancel (recommended)" });
     cancelBtn.addClass("mod-cta");
-    cancelBtn.onclick = () => { this.close(); this.onCancel(); };
+    cancelBtn.onclick = () => { this._decided = true; this.close(); this.onCancel(); };
     const forceBtn = row.createEl("button", { text: "Force Push Anyway" });
     forceBtn.addClass("dgs-btn-warning");
-    forceBtn.onclick = () => { this.close(); this.onForce(); };
+    forceBtn.onclick = () => { this._decided = true; this.close(); this.onForce(); };
   }
 
-  onClose() { this.contentEl.empty(); }
+  onClose() {
+    // Clicking outside / pressing Esc → treat as cancel
+    if (!this._decided) this.onCancel();
+    this.contentEl.empty();
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -546,19 +606,22 @@ class DirectGitHubSyncPlugin extends Plugin {
     this._isSyncing = false;
     this._statusBarState = "idle";
     this._statusBarDetail = "";
+    this._pendingConflicts = null;
     this._initStatusBar();
 
     // ── Passive monitor ──
     this._passiveTimer = null;
     this._startPassiveMonitor();
 
-    // ── Auto-sync ──
-    this._autoSyncTimeout = null;
+    // ── Smart sync ──
+    this._smartSyncTimeout = null;
+
     this.app.workspace.onLayoutReady(() => {
-      if (this.settings.syncOnStartup && this.settings.autoSyncEnabled) {
-        setTimeout(() => this.sync({ silent: true }), 5000);
+      if (this.settings.syncOnStartup && this.settings.autoSyncEnabled && this._isConfigured()) {
+        // Delay startup sync to let the vault fully index
+        setTimeout(() => this.sync({ silent: true }), 6000);
       }
-      this._initAutoSync();
+      this._initSmartSync();
     });
 
     console.log("[DGS] Plugin loaded.");
@@ -566,7 +629,7 @@ class DirectGitHubSyncPlugin extends Plugin {
 
   onunload() {
     if (this._passiveTimer) clearInterval(this._passiveTimer);
-    if (this._autoSyncTimeout) clearTimeout(this._autoSyncTimeout);
+    if (this._smartSyncTimeout) clearTimeout(this._smartSyncTimeout);
     if (this._relativeTimeTimer) clearInterval(this._relativeTimeTimer);
     console.log("[DGS] Plugin unloaded.");
   }
@@ -576,6 +639,10 @@ class DirectGitHubSyncPlugin extends Plugin {
   async loadSettings() {
     const raw = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
+    // Guard against corrupted saves
+    if (!this.settings.syncCache || typeof this.settings.syncCache !== "object") {
+      this.settings.syncCache = {};
+    }
     // Migrate old lastPulledShas → syncCache
     if (this.settings.lastPulledShas && Object.keys(this.settings.lastPulledShas).length > 0) {
       if (!this.settings.syncCache || Object.keys(this.settings.syncCache).length === 0) {
@@ -587,7 +654,12 @@ class DirectGitHubSyncPlugin extends Plugin {
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    try {
+      await this.saveData(this.settings);
+    } catch (e) {
+      console.error("[DGS] Failed to save settings:", e);
+      // Don't throw — a settings-save failure must not abort an in-progress sync
+    }
   }
 
   // ── Validation ────────────────────────────────────────────────────────
@@ -595,18 +667,23 @@ class DirectGitHubSyncPlugin extends Plugin {
   _validate() {
     const s = this.settings;
     const issues = [];
-    if (!s.pat) issues.push("PAT is not set.");
-    if (!s.username) issues.push("Username is not set.");
-    if (!s.repo) issues.push("Repository is not set.");
+    if (!s.pat) issues.push("Personal Access Token (PAT) is not set.");
+    if (!s.username) issues.push("GitHub username is not set.");
+    if (!s.repo) issues.push("Repository name is not set.");
     if (!s.branch) issues.push("Branch is not set.");
-    if (issues.length > 0) throw new Error("Settings incomplete — open plugin settings:\n• " + issues.join("\n• "));
+    if (issues.length > 0) {
+      throw new Error(
+        "Connection not configured — open plugin settings and click Configure Connection:\n• " +
+          issues.join("\n• ")
+      );
+    }
     if (!/^(ghp_|github_pat_|gho_|ghs_|ghr_)/.test(s.pat))
-      throw new Error("PAT format looks incorrect — should start with 'ghp_' or 'github_pat_'.");
+      throw new Error("PAT format looks incorrect — it should start with 'ghp_' or 'github_pat_'.");
   }
 
   _isConfigured() {
     const s = this.settings;
-    return s.pat && s.username && s.repo && s.branch;
+    return !!(s.pat && s.username && s.repo && s.branch);
   }
 
   _client() {
@@ -622,7 +699,7 @@ class DirectGitHubSyncPlugin extends Plugin {
     this._statusBarIconEl = this._statusBarEl.createSpan({ cls: "dgs-statusbar-icon" });
     this._statusBarTextEl = this._statusBarEl.createSpan({ cls: "dgs-statusbar-text" });
     this._statusBarEl.addEventListener("click", () => this._onStatusBarClick());
-    this._updateStatusBar("idle");
+    this._updateStatusBar(this._isConfigured() ? "idle" : "unconfigured");
 
     // Update relative time every 30s
     this._relativeTimeTimer = window.setInterval(() => {
@@ -632,9 +709,8 @@ class DirectGitHubSyncPlugin extends Plugin {
 
   _updateStatusBar(state, detail) {
     this._statusBarState = state;
-    if (detail) this._statusBarDetail = detail;
+    if (detail !== undefined) this._statusBarDetail = detail;
 
-    // Clear all state classes
     const el = this._statusBarEl;
     el.className = "dgs-statusbar-item";
 
@@ -642,33 +718,43 @@ class DirectGitHubSyncPlugin extends Plugin {
     const text = this._statusBarTextEl;
     icon.empty();
 
+    const detailObj = (detail && typeof detail === "object") ? detail : {};
+    const detailStr = (typeof detail === "string") ? detail : "";
+
     const states = {
-      idle: { icon: "cloud", text: "DGS", cls: "dgs-sb-idle" },
-      unconfigured: { icon: "cloud-off", text: "Not configured", cls: "dgs-sb-unconfigured" },
-      syncing: { icon: "refresh-cw", text: "Syncing…", cls: "dgs-sb-syncing" },
-      synced: { icon: "check-circle-2", text: `Synced · ${formatRelativeTime(this.settings.lastSyncTime)}`, cls: "dgs-sb-synced" },
-      "local-ahead": { icon: "upload-cloud", text: detail?.count ? `↑ ${detail.count} to push` : "↑ Local changes", cls: "dgs-sb-local-ahead" },
-      "remote-ahead": { icon: "download-cloud", text: "↓ Remote changes", cls: "dgs-sb-remote-ahead" },
-      diverged: { icon: "git-compare", text: `↑${detail?.localAhead || "?"} ↓ remote`, cls: "dgs-sb-diverged" },
-      conflicts: { icon: "zap", text: detail || "Conflicts", cls: "dgs-sb-conflicts" },
-      error: { icon: "alert-triangle", text: "Sync error", cls: "dgs-sb-error" },
-      offline: { icon: "wifi-off", text: "Offline", cls: "dgs-sb-offline" },
+      idle:           { icon: "cloud",          text: "DGS",                                                       cls: "dgs-sb-idle" },
+      unconfigured:   { icon: "cloud-off",       text: "Not configured",                                            cls: "dgs-sb-unconfigured" },
+      syncing:        { icon: "refresh-cw",      text: "Syncing…",                                                  cls: "dgs-sb-syncing" },
+      synced:         { icon: "check-circle-2",  text: `Synced${this.settings.lastSyncTime ? " · " + formatRelativeTime(this.settings.lastSyncTime) : ""}`, cls: "dgs-sb-synced" },
+      "local-ahead":  { icon: "upload-cloud",    text: detailObj.count ? `${detailObj.count} to push` : "Local changes", cls: "dgs-sb-local-ahead" },
+      "remote-ahead": { icon: "download-cloud",  text: "Remote changes",                                            cls: "dgs-sb-remote-ahead" },
+      diverged:       { icon: "git-compare",     text: `${detailObj.localAhead || "?"} local, remote changed`,    cls: "dgs-sb-diverged" },
+      conflicts:      { icon: "git-merge",       text: detailStr || "Conflicts",                                    cls: "dgs-sb-conflicts" },
+      error:          { icon: "alert-triangle",  text: "Sync error",                                                cls: "dgs-sb-error" },
+      offline:        { icon: "wifi-off",        text: "Offline",                                                   cls: "dgs-sb-offline" },
     };
 
     const s = states[state] || states.idle;
-    try { setIcon(icon, s.icon); } catch { icon.setText("●"); }
+    try { setIcon(icon, s.icon); } catch { icon.setText("•"); }
     text.setText(s.text);
     el.addClass(s.cls);
   }
 
   _onStatusBarClick() {
-    if (this._statusBarState === "syncing") return;
+    if (this._statusBarState === "syncing") {
+      new Notice("Sync is already in progress.", 3000);
+      return;
+    }
     if (this._statusBarState === "unconfigured") {
-      new Notice("Configure GitHub settings first.", 4000);
+      new Notice("Connection not configured — open plugin settings.", 4000);
       return;
     }
     if (this._statusBarState === "error") {
-      new Notice(`Last error: ${this._statusBarDetail || "Unknown"}`, 8000);
+      new Notice(`Last sync error: ${this._statusBarDetail || "Unknown error"}`, 8000);
+      return;
+    }
+    if (this._statusBarState === "conflicts" && this._pendingConflicts) {
+      this._resumePendingConflicts();
       return;
     }
     this.sync();
@@ -677,8 +763,7 @@ class DirectGitHubSyncPlugin extends Plugin {
   // ── Passive Monitor ───────────────────────────────────────────────────
 
   _startPassiveMonitor() {
-    // Delay first check
-    setTimeout(() => this._checkSyncStatus(), 8000);
+    setTimeout(() => this._checkSyncStatus(), 10000);
     this._passiveTimer = window.setInterval(() => this._checkSyncStatus(), PASSIVE_POLL_INTERVAL_MS);
   }
 
@@ -690,12 +775,15 @@ class DirectGitHubSyncPlugin extends Plugin {
       const client = this._client();
       const { commitSha } = await client.getLatestCommit();
 
-      const remoteAhead = this.settings.lastKnownRemoteCommit &&
-        commitSha !== this.settings.lastKnownRemoteCommit;
+      const remoteAhead = !!(
+        this.settings.lastKnownRemoteCommit &&
+        commitSha !== this.settings.lastKnownRemoteCommit
+      );
 
-      // Quick local check via mtimes
+      // Quick local estimate via mtimes
       const lastSync = this.settings.lastSyncTime || 0;
-      const localFiles = this.app.vault.getFiles()
+      const localFiles = this.app.vault
+        .getFiles()
         .filter((f) => !shouldIgnorePath(normalisePath(f.path), this.settings));
       const cache = this.settings.syncCache || {};
 
@@ -705,9 +793,8 @@ class DirectGitHubSyncPlugin extends Plugin {
         const p = normalisePath(f.path);
         localPaths.add(p);
         if (!cache[p]) { localAhead++; continue; }
-        if (f.stat.mtime > lastSync) localAhead++;
+        if (lastSync > 0 && f.stat.mtime > lastSync) localAhead++;
       }
-      // Locally deleted files
       for (const cp of Object.keys(cache)) {
         if (!localPaths.has(cp) && !shouldIgnorePath(cp, this.settings)) localAhead++;
       }
@@ -718,51 +805,164 @@ class DirectGitHubSyncPlugin extends Plugin {
         this._updateStatusBar("local-ahead", { count: localAhead });
       } else if (remoteAhead) {
         this._updateStatusBar("remote-ahead");
-      } else {
+      } else if (this._statusBarState !== "conflicts") {
         this._updateStatusBar("synced");
       }
     } catch (e) {
       if (e.status === 0) this._updateStatusBar("offline");
-      else this._updateStatusBar("error", e.message);
+      // Don't overwrite a "conflicts" or "synced" state with a transient poll error
+      else if (this._statusBarState !== "conflicts" && this._statusBarState !== "synced") {
+        this._updateStatusBar("error", e.message);
+      }
     }
   }
 
-  // ── Auto-Sync ─────────────────────────────────────────────────────────
+  // ── Smart Sync ────────────────────────────────────────────────────────
+  //
+  //  Improvements over the old auto-sync:
+  //  1. Tracks vault idle time — only fires after no file events for the
+  //     configured interval.
+  //  2. Performs a cheap remote-head check before running a full sync to
+  //     avoid redundant API traffic on quiet devices.
+  //  3. Stores pending conflict plans so they survive across the modal
+  //     dismiss/re-open cycle.
+  //  4. Re-arms itself cleanly on each fire rather than being one-shot.
+  // ─────────────────────────────────────────────────────────────────────
 
-  _initAutoSync() {
+  _initSmartSync() {
     if (!this.settings.autoSyncEnabled) return;
 
-    const resetTimer = () => {
-      if (this._autoSyncTimeout) clearTimeout(this._autoSyncTimeout);
-      this._autoSyncTimeout = setTimeout(
-        () => this.sync({ silent: true }),
-        this.settings.autoSyncInterval * 60 * 1000
-      );
+    const idleMs = Math.max(60_000, (this.settings.autoSyncInterval || 5) * 60_000);
+
+    const arm = () => {
+      if (this._smartSyncTimeout) clearTimeout(this._smartSyncTimeout);
+      this._smartSyncTimeout = setTimeout(() => this._smartSyncFire(), idleMs);
     };
 
-    this.registerEvent(this.app.vault.on("modify", resetTimer));
-    this.registerEvent(this.app.vault.on("create", resetTimer));
-    this.registerEvent(this.app.vault.on("delete", resetTimer));
-    this.registerEvent(this.app.vault.on("rename", resetTimer));
+    this.registerEvent(this.app.vault.on("modify", arm));
+    this.registerEvent(this.app.vault.on("create", arm));
+    this.registerEvent(this.app.vault.on("delete", arm));
+    this.registerEvent(this.app.vault.on("rename", arm));
+
+    // Arm immediately so a startup sync can fire even with no activity
+    arm();
+  }
+
+  async _smartSyncFire() {
+    if (this._isSyncing) {
+      // Sync already running; re-arm to check again after another idle window
+      this._initSmartSync();
+      return;
+    }
+    if (!this._isConfigured()) return;
+
+    // Cheap pre-check: is there actually anything to do?
+    try {
+      const client = this._client();
+      const { commitSha } = await client.getLatestCommit();
+      const localHasChanges = this._hasLocalChanges();
+      const remoteChanged = !!(
+        this.settings.lastKnownRemoteCommit &&
+        commitSha !== this.settings.lastKnownRemoteCommit
+      );
+
+      if (!localHasChanges && !remoteChanged) {
+        // Nothing to do; update cursor if it was blank
+        if (!this.settings.lastKnownRemoteCommit) {
+          this.settings.lastKnownRemoteCommit = commitSha;
+          await this.saveSettings();
+        }
+        return;
+      }
+    } catch (e) {
+      if (e.status === 0) return; // offline — skip silently
+      console.warn("[DGS] Smart sync pre-check failed:", e.message);
+      return;
+    }
+
+    await this.sync({ silent: true });
+  }
+
+  /**
+   * Fast heuristic: have any local files changed since the last sync?
+   * Uses mtimes only — no hashing. Suitable for deciding whether to bother syncing.
+   */
+  _hasLocalChanges() {
+    const lastSync = this.settings.lastSyncTime || 0;
+    const cache = this.settings.syncCache || {};
+    const localPaths = new Set();
+
+    for (const f of this.app.vault.getFiles()) {
+      const p = normalisePath(f.path);
+      if (shouldIgnorePath(p, this.settings)) continue;
+      localPaths.add(p);
+      if (!cache[p]) return true;                              // new file
+      if (lastSync > 0 && f.stat.mtime > lastSync) return true; // modified
+    }
+    // Files deleted locally but still in cache
+    for (const cp of Object.keys(cache)) {
+      if (!shouldIgnorePath(cp, this.settings) && !localPaths.has(cp)) return true;
+    }
+    return false;
+  }
+
+  /** Re-open the conflict modal for a pending smart-sync plan. */
+  async _resumePendingConflicts() {
+    if (!this._pendingConflicts) return;
+    const {
+      plan, localBuffers, client, concurrency,
+      commitSha, treeSha, remoteTree, localEntries, cache,
+    } = this._pendingConflicts;
+
+    const resolutions = await new Promise((resolve) => {
+      new ConflictResolutionModal(
+        this.app,
+        plan.conflicts,
+        (res) => resolve(res),
+        () => resolve(null)
+      ).open();
+    });
+
+    if (!resolutions) {
+      this._updateStatusBar(
+        "conflicts",
+        `${plan.conflicts.length} unresolved — click to resolve`
+      );
+      return;
+    }
+
+    this._pendingConflicts = null;
+    this._isSyncing = true;
+    this._updateStatusBar("syncing");
+
+    try {
+      await this._applyConflictResolutions(plan, resolutions, localBuffers);
+      await this._executeSyncPlan(
+        plan, client, concurrency, commitSha, treeSha,
+        remoteTree, localEntries, cache, () => {}, false
+      );
+    } catch (e) {
+      console.error("[DGS] Error resolving conflicts:", e);
+      new Notice(`Sync failed after conflict resolution: ${e.message}`, 10000);
+      this._updateStatusBar("error", e.message);
+    } finally {
+      this._isSyncing = false;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────
   //  THREE-WAY SYNC ENGINE
   // ─────────────────────────────────────────────────────────────────────
 
-  /**
-   * Build the three-way sync plan.
-   * Compares Base (cache) vs Local vs Remote for every known path.
-   */
   _buildSyncPlan(localEntries, remoteBlobs, cache) {
     const plan = {
-      toUpload: [],        // { path, sha, buf }
-      toDownload: [],      // { path, sha }     (remote blob SHA)
-      toDeleteRemote: [],  // [ path ]
-      toDeleteLocal: [],   // [ path ]
-      conflicts: [],       // { path, localSha, remoteSha, baseSha }
-      upToDate: [],        // [ path ]
-      toCleanCache: [],    // [ path ]  (stale cache entries)
+      toUpload: [],
+      toDownload: [],
+      toDeleteRemote: [],
+      toDeleteLocal: [],
+      conflicts: [],
+      upToDate: [],
+      toCleanCache: [],
     };
 
     const localMap = new Map();
@@ -785,13 +985,13 @@ class DirectGitHubSyncPlugin extends Plugin {
       const localSha = local ? local.sha : null;
       const remoteSha = remoteMap.get(path) || null;
 
-      // ── Case 1: All identical ──
+      // Case 1: All identical
       if (localSha === remoteSha && localSha === base) {
         if (localSha) plan.upToDate.push(path);
         continue;
       }
 
-      // ── Case 2: No base (new files) ──
+      // Case 2: No base (first time seen)
       if (!base) {
         if (localSha && !remoteSha) {
           plan.toUpload.push(local);
@@ -801,27 +1001,25 @@ class DirectGitHubSyncPlugin extends Plugin {
           if (localSha === remoteSha) plan.upToDate.push(path);
           else plan.conflicts.push({ path, localSha, remoteSha, baseSha: null });
         }
+        // both null — ghost allPaths entry, skip
         continue;
       }
 
-      // ── Case 3: Base exists ──
+      // Case 3: Base exists
       const localUnchanged = localSha === base;
       const remoteUnchanged = remoteSha === base;
 
       if (localUnchanged && remoteUnchanged) {
         plan.upToDate.push(path);
       } else if (!localUnchanged && remoteUnchanged) {
-        // Local changed, remote didn't
         if (localSha) plan.toUpload.push(local);
-        else plan.toDeleteRemote.push(path);   // local deleted
+        else plan.toDeleteRemote.push(path);
       } else if (localUnchanged && !remoteUnchanged) {
-        // Remote changed, local didn't
         if (remoteSha) plan.toDownload.push({ path, sha: remoteSha });
-        else plan.toDeleteLocal.push(path);   // remote deleted
+        else plan.toDeleteLocal.push(path);
       } else {
         // Both changed
         if (localSha === remoteSha) {
-          // Same edit on both sides (or both deleted)
           if (!localSha && !remoteSha) plan.toCleanCache.push(path);
           else plan.upToDate.push(path);
         } else {
@@ -833,9 +1031,6 @@ class DirectGitHubSyncPlugin extends Plugin {
     return plan;
   }
 
-  /**
-   * Apply user's conflict resolutions to the plan.
-   */
   async _applyConflictResolutions(plan, resolutions, localBuffers) {
     for (const conflict of [...plan.conflicts]) {
       const resolution = resolutions[conflict.path];
@@ -846,6 +1041,7 @@ class DirectGitHubSyncPlugin extends Plugin {
           if (conflict.localSha) {
             const buf = localBuffers.get(conflict.path);
             if (buf) plan.toUpload.push({ path: conflict.path, sha: conflict.localSha, buf });
+            else console.warn(`[DGS] keep-local: missing buffer for "${conflict.path}"`);
           } else {
             plan.toDeleteRemote.push(conflict.path);
           }
@@ -861,28 +1057,33 @@ class DirectGitHubSyncPlugin extends Plugin {
 
         case "keep-both": {
           if (conflict.localSha && conflict.remoteSha) {
-            // Rename local file, download remote to original path
-            const ext = conflict.path.includes(".") ? "." + conflict.path.split(".").pop() : "";
-            const baseName = conflict.path.includes(".")
-              ? conflict.path.slice(0, conflict.path.lastIndexOf("."))
-              : conflict.path;
+            // Rename local file to a conflict copy, then download remote to original path
+            const lastDot = conflict.path.lastIndexOf(".");
+            const hasExt = lastDot > conflict.path.lastIndexOf("/");
+            const ext = hasExt ? conflict.path.slice(lastDot) : "";
+            const base = hasExt ? conflict.path.slice(0, lastDot) : conflict.path;
             const dateStr = new Date().toISOString().slice(0, 10);
-            const newPath = `${baseName} (Local Conflict - ${dateStr})${ext}`;
+            const newPath = `${base} (Local Conflict ${dateStr})${ext}`;
 
             const file = this.app.vault.getAbstractFileByPath(conflict.path);
             if (file) {
-              await this.app.vault.rename(file, newPath);
-              const renamedBuf = await this.app.vault.adapter.readBinary(newPath);
-              const renamedSha = await computeGitBlobSha(renamedBuf);
-              plan.toUpload.push({ path: newPath, sha: renamedSha, buf: renamedBuf });
+              try {
+                await this.app.vault.rename(file, newPath);
+                const renamedBuf = await this.app.vault.adapter.readBinary(newPath);
+                const renamedSha = await computeGitBlobSha(renamedBuf);
+                plan.toUpload.push({ path: newPath, sha: renamedSha, buf: renamedBuf });
+              } catch (renameErr) {
+                console.warn(`[DGS] keep-both rename failed for "${conflict.path}": ${renameErr.message}`);
+                // Fall back to keep-local
+                const buf = localBuffers.get(conflict.path);
+                if (buf) plan.toUpload.push({ path: conflict.path, sha: conflict.localSha, buf });
+              }
             }
             plan.toDownload.push({ path: conflict.path, sha: conflict.remoteSha });
           } else if (conflict.localSha) {
-            // Remote deleted, keep local → upload
             const buf = localBuffers.get(conflict.path);
             if (buf) plan.toUpload.push({ path: conflict.path, sha: conflict.localSha, buf });
           } else if (conflict.remoteSha) {
-            // Local deleted, keep remote → download
             plan.toDownload.push({ path: conflict.path, sha: conflict.remoteSha });
           }
           break;
@@ -910,7 +1111,7 @@ class DirectGitHubSyncPlugin extends Plugin {
     this._isSyncing = true;
     this._updateStatusBar("syncing");
     const client = this._client();
-    const concurrency = this.settings.concurrency || 5;
+    const concurrency = Math.max(1, this.settings.concurrency || 5);
     const notice = silent ? null : new Notice("Sync: connecting…", 0);
     const setMsg = (msg) => { if (notice) notice.setMessage(msg); };
 
@@ -929,17 +1130,17 @@ class DirectGitHubSyncPlugin extends Plugin {
 
       // 2. Snapshot local files
       setMsg("Sync: scanning local files…");
-      const allFiles = this.app.vault.getFiles().filter(
-        (f) => !shouldIgnorePath(normalisePath(f.path), this.settings)
-      );
+      const allFiles = this.app.vault
+        .getFiles()
+        .filter((f) => !shouldIgnorePath(normalisePath(f.path), this.settings));
 
-      // File size filter
       const oversized = allFiles.filter((f) => f.stat.size > MAX_SYNC_FILE_SIZE);
       const files = allFiles.filter((f) => f.stat.size <= MAX_SYNC_FILE_SIZE);
       if (oversized.length > 0) {
         const names = oversized.map((f) => f.path).join(", ");
         console.warn(`[DGS] Skipping ${oversized.length} file(s) > 50MB: ${names}`);
-        if (!silent) new Notice(`⚠️ ${oversized.length} file(s) > 50MB skipped (GitHub limit):\n${names}`, 8000);
+        if (!silent)
+          new Notice(`${oversized.length} file(s) over 50MB were skipped (GitHub limit):\n${names}`, 8000);
       }
 
       // Hash local files
@@ -952,16 +1153,14 @@ class DirectGitHubSyncPlugin extends Plugin {
 
       const hashFailed = hashResults.filter((r) => !r.ok);
       const localEntries = hashResults.filter((r) => r.ok).map((r) => r.value);
-      if (hashFailed.length > 0 && !silent) {
-        new Notice(`⚠️ ${hashFailed.length} file(s) unreadable, skipped.`, 6000);
-      }
+      if (hashFailed.length > 0 && !silent)
+        new Notice(`${hashFailed.length} file(s) could not be read and were skipped.`, 6000);
 
       // 3. Build three-way sync plan
       setMsg("Sync: analyzing changes…");
       const cache = this.settings.syncCache || {};
       const plan = this._buildSyncPlan(localEntries, remoteBlobs, cache);
 
-      // Store buffers for conflict resolution
       const localBuffers = new Map();
       for (const e of localEntries) localBuffers.set(e.path, e.buf);
 
@@ -970,10 +1169,16 @@ class DirectGitHubSyncPlugin extends Plugin {
         if (notice) notice.hide();
 
         if (silent) {
-          // Auto-sync: show status bar indicator, don't show modal
-          this._updateStatusBar("conflicts", `${plan.conflicts.length} conflict(s) — click to resolve`);
-          this._pendingConflicts = { plan, localBuffers, client, concurrency, commitSha, treeSha, remoteTree, localEntries, remoteBlobs, cache };
+          // Smart sync: stash the plan, surface via status bar
+          this._pendingConflicts = {
+            plan, localBuffers, client, concurrency, commitSha, treeSha,
+            remoteTree, localEntries, remoteBlobs, cache,
+          };
           this._isSyncing = false;
+          this._updateStatusBar(
+            "conflicts",
+            `${plan.conflicts.length} conflict${plan.conflicts.length === 1 ? "" : "s"} — click to resolve`
+          );
           return;
         }
 
@@ -987,7 +1192,10 @@ class DirectGitHubSyncPlugin extends Plugin {
         });
 
         if (!resolutions) {
-          this._updateStatusBar("conflicts", `${plan.conflicts.length} unresolved`);
+          this._updateStatusBar(
+            "conflicts",
+            `${plan.conflicts.length} unresolved — click to resolve`
+          );
           this._isSyncing = false;
           return;
         }
@@ -995,14 +1203,20 @@ class DirectGitHubSyncPlugin extends Plugin {
         await this._applyConflictResolutions(plan, resolutions, localBuffers);
       }
 
-      // 5. Execute sync plan
-      await this._executeSyncPlan(plan, client, concurrency, commitSha, treeSha, remoteTree, localEntries, cache, setMsg, silent);
+      // 5. Execute
+      await this._executeSyncPlan(
+        plan, client, concurrency, commitSha, treeSha,
+        remoteTree, localEntries, cache, setMsg, silent
+      );
 
       if (notice) setTimeout(() => notice.hide(), 6000);
 
     } catch (e) {
       console.error("[DGS] Sync error:", e);
-      if (notice) { notice.setMessage(`Sync failed: ${e.message}`); setTimeout(() => notice.hide(), 12000); }
+      if (notice) {
+        notice.setMessage(`Sync failed: ${e.message}`);
+        setTimeout(() => notice.hide(), 12000);
+      }
       if (e.status === 0) this._updateStatusBar("offline");
       else this._updateStatusBar("error", e.message);
     } finally {
@@ -1010,18 +1224,18 @@ class DirectGitHubSyncPlugin extends Plugin {
     }
   }
 
-  /**
-   * Execute a sync plan: downloads, local deletions, uploads, remote deletions, commit.
-   */
   async _executeSyncPlan(plan, client, concurrency, commitSha, treeSha, remoteTree, localEntries, cache, setMsg, silent) {
     const newCache = { ...cache };
     let downloaded = 0, uploaded = 0, deletedLocal = 0, deletedRemote = 0;
 
     // Nothing to do?
-    if (plan.toUpload.length === 0 && plan.toDownload.length === 0 &&
-      plan.toDeleteRemote.length === 0 && plan.toDeleteLocal.length === 0) {
+    if (
+      plan.toUpload.length === 0 &&
+      plan.toDownload.length === 0 &&
+      plan.toDeleteRemote.length === 0 &&
+      plan.toDeleteLocal.length === 0
+    ) {
       setMsg("Sync: already up to date.");
-      // Still update cache for upToDate entries and commit cursor
       for (const e of localEntries) newCache[e.path] = e.sha;
       for (const p of plan.toCleanCache) delete newCache[p];
       this.settings.syncCache = newCache;
@@ -1035,7 +1249,6 @@ class DirectGitHubSyncPlugin extends Plugin {
     // ── Downloads ──
     if (plan.toDownload.length > 0) {
       setMsg(`Sync: downloading ${plan.toDownload.length} file(s)…`);
-      // Ensure remote folders exist locally
       const folders = remoteTree.filter((n) => n.type === "tree");
       for (const folder of folders) {
         const fp = normalisePath(folder.path);
@@ -1062,19 +1275,18 @@ class DirectGitHubSyncPlugin extends Plugin {
           await this.app.vault.createBinary(fp, buf);
         }
         downloaded++;
-        setMsg(`Sync: downloaded ${downloaded}/${plan.toDownload.length}…`);
+        setMsg(`Sync: downloading… ${downloaded}/${plan.toDownload.length}`);
         return { path: fp, sha: item.sha };
       });
       for (const r of dlResults) { if (r.ok) newCache[r.value.path] = r.value.sha; }
       const dlFailed = dlResults.filter((r) => !r.ok);
-      if (dlFailed.length > 0 && !silent) {
-        new Notice(`⚠️ ${dlFailed.length} file(s) failed to download.`, 8000);
-      }
+      if (dlFailed.length > 0 && !silent)
+        new Notice(`${dlFailed.length} file(s) failed to download.`, 8000);
     }
 
     // ── Local deletions ──
     if (plan.toDeleteLocal.length > 0) {
-      setMsg(`Sync: deleting ${plan.toDeleteLocal.length} local file(s)…`);
+      setMsg(`Sync: removing ${plan.toDeleteLocal.length} local file(s) deleted remotely…`);
       for (const fp of plan.toDeleteLocal) {
         try {
           const existing = this.app.vault.getAbstractFileByPath(fp);
@@ -1095,18 +1307,17 @@ class DirectGitHubSyncPlugin extends Plugin {
         const b64 = arrayBufferToBase64(item.buf);
         const blobSha = await client.createBlob(b64);
         uploaded++;
-        setMsg(`Sync: uploaded ${uploaded}/${plan.toUpload.length}…`);
+        setMsg(`Sync: uploading… ${uploaded}/${plan.toUpload.length}`);
         return { path: item.path, sha: blobSha };
       });
       uploadedEntries = ulResults.filter((r) => r.ok).map((r) => r.value);
       for (const e of uploadedEntries) newCache[e.path] = e.sha;
       const ulFailed = ulResults.filter((r) => !r.ok);
-      if (ulFailed.length > 0 && !silent) {
-        new Notice(`⚠️ ${ulFailed.length} file(s) failed to upload.`, 8000);
-      }
+      if (ulFailed.length > 0 && !silent)
+        new Notice(`${ulFailed.length} file(s) failed to upload.`, 8000);
     }
 
-    // ── Commit (if there were uploads or remote deletions) ──
+    // ── Commit ──
     let newCommitSha = commitSha;
     if (uploadedEntries.length > 0 || plan.toDeleteRemote.length > 0) {
       setMsg("Sync: creating commit…");
@@ -1116,83 +1327,81 @@ class DirectGitHubSyncPlugin extends Plugin {
       const newTreeSha = await client.createTree(treeSha, treeItems, plan.toDeleteRemote);
       const msg = buildCommitMessage(this.settings.deviceName);
       newCommitSha = await client.createCommit(msg, newTreeSha, commitSha);
-      setMsg("Sync: updating branch…");
+      setMsg("Sync: updating branch ref…");
       await client.updateRef(newCommitSha);
       for (const dp of plan.toDeleteRemote) delete newCache[dp];
       deletedRemote = plan.toDeleteRemote.length;
     }
 
-    // ── Update upToDate entries in cache ──
+    // Refresh cache for confirmed-upToDate files
     for (const path of plan.upToDate) {
       const localEntry = localEntries.find((e) => e.path === path);
       if (localEntry) newCache[path] = localEntry.sha;
     }
     for (const p of plan.toCleanCache) delete newCache[p];
 
-    // ── Persist ──
+    // Persist
     this.settings.syncCache = newCache;
     this.settings.lastKnownRemoteCommit = newCommitSha;
     this.settings.lastSyncTime = Date.now();
     await this.saveSettings();
 
-    // ── Summary ──
+    // Summary
     const parts = [];
     if (downloaded > 0) parts.push(`${downloaded} downloaded`);
     if (uploaded > 0) parts.push(`${uploaded} uploaded`);
     if (deletedLocal > 0) parts.push(`${deletedLocal} deleted locally`);
     if (deletedRemote > 0) parts.push(`${deletedRemote} deleted remotely`);
-    const summary = parts.length > 0 ? parts.join(", ") : "up to date";
+    const summary = parts.length > 0 ? parts.join(", ") : "already up to date";
     setMsg(`Sync complete — ${summary}.`);
     this._updateStatusBar("synced");
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  PUSH  (Local → GitHub)  — one-directional with safety checks
+  //  PUSH  (Local → GitHub)
   // ─────────────────────────────────────────────────────────────────────
 
   async push(forcePush = false) {
     try { this._validate(); } catch (e) { new Notice(e.message, 8000); return; }
 
     const client = this._client();
-    const concurrency = this.settings.concurrency || 5;
+    const concurrency = Math.max(1, this.settings.concurrency || 5);
     const status = new Notice("Push: connecting…", 0);
 
     try {
-      // 0. Bootstrap
       const initialised = await client.initRepoIfNeeded();
       if (initialised) { status.setMessage("Push: initialised empty repository."); await sleep(800); }
 
-      // 1. Fetch remote + local
       status.setMessage("Push: reading local and remote state…");
       const [{ commitSha, treeSha }, allFiles] = await Promise.all([
         client.getLatestCommit(),
         Promise.resolve(this.app.vault.getFiles()),
       ]);
 
-      // ── Conflict detection (remote ahead) ──
+      // Safety: remote has moved since last sync
       if (!forcePush && this.settings.lastKnownRemoteCommit &&
         this.settings.lastKnownRemoteCommit !== commitSha) {
         status.hide();
-        new ConflictModal(this.app, commitSha,
+        new ConflictModal(
+          this.app,
+          commitSha,
           () => this.push(true),
-          () => new Notice("Push cancelled. Pull or Sync first.", 6000)
+          () => new Notice("Push cancelled. Pull or Sync first to incorporate remote changes.", 6000)
         ).open();
         return;
       }
 
       const remoteTreePromise = client.getFullTree(treeSha);
 
-      // Filter files
       const files = allFiles.filter((f) => {
         const p = normalisePath(f.path);
         return !shouldIgnorePath(p, this.settings) && f.stat.size <= MAX_SYNC_FILE_SIZE;
       });
-
-      // Warn about oversized files
-      const oversized = allFiles.filter((f) => f.stat.size > MAX_SYNC_FILE_SIZE && !shouldIgnorePath(normalisePath(f.path), this.settings));
-      if (oversized.length > 0) {
-        new Notice(`⚠️ ${oversized.length} file(s) > 50MB skipped.`, 6000);
-      }
+      const oversized = allFiles.filter(
+        (f) => f.stat.size > MAX_SYNC_FILE_SIZE && !shouldIgnorePath(normalisePath(f.path), this.settings)
+      );
+      if (oversized.length > 0)
+        new Notice(`${oversized.length} file(s) over 50MB skipped.`, 6000);
 
       if (files.length === 0) {
         status.setMessage("Push: nothing to push — vault is empty.");
@@ -1200,7 +1409,6 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // 2. Hash + remote tree
       status.setMessage(`Push: scanning ${files.length} local file(s)…`);
       const [remoteTree, hashResults] = await Promise.all([
         remoteTreePromise,
@@ -1213,14 +1421,14 @@ class DirectGitHubSyncPlugin extends Plugin {
 
       const hashFailed = hashResults.filter((r) => !r.ok);
       const localEntries = hashResults.filter((r) => r.ok).map((r) => r.value);
-      if (hashFailed.length > 0) {
-        new Notice(`⚠️ ${hashFailed.length} file(s) unreadable, skipped.`, 8000);
-      }
+      if (hashFailed.length > 0)
+        new Notice(`${hashFailed.length} file(s) could not be read and were skipped.`, 8000);
 
       const remoteShaMap = {};
-      for (const node of remoteTree) { if (node.type === "blob") remoteShaMap[node.path] = node.sha; }
+      for (const node of remoteTree) {
+        if (node.type === "blob") remoteShaMap[normalisePath(node.path)] = node.sha;
+      }
 
-      // 3. Diff
       const localPaths = new Set(localEntries.map((e) => e.path));
       const changed = localEntries.filter((e) => remoteShaMap[e.path] !== e.sha);
       const unchanged = localEntries.filter((e) => remoteShaMap[e.path] === e.sha);
@@ -1230,41 +1438,45 @@ class DirectGitHubSyncPlugin extends Plugin {
       });
 
       if (changed.length === 0 && toDeleteRemotely.length === 0) {
-        // ── FIX: Don't blindly update commit cursor if remote moved ──
         if (this.settings.lastKnownRemoteCommit && commitSha !== this.settings.lastKnownRemoteCommit) {
           status.setMessage("No local changes, but remote has new commits. Pull or Sync first.");
         } else {
-          status.setMessage("Push: already up to date — nothing changed.");
+          status.setMessage("Push: already up to date — no local changes.");
           this.settings.lastKnownRemoteCommit = commitSha;
           await this.saveSettings();
         }
         setTimeout(() => status.hide(), 5000);
+        this._updateStatusBar("synced");
         return;
       }
 
-      // 4. Upload blobs
       let uploadCount = 0;
       if (changed.length > 0) status.setMessage(`Push: uploading ${changed.length} file(s)…`);
       const uploadResults = await parallelBatch(changed, concurrency, async (f) => {
         const b64 = arrayBufferToBase64(f.buf);
         const blobSha = await client.createBlob(b64);
         uploadCount++;
-        status.setMessage(`Push: uploaded ${uploadCount}/${changed.length}…`);
+        status.setMessage(`Push: uploading… ${uploadCount}/${changed.length}`);
         return { path: f.path, sha: blobSha };
       });
       const uploadFailed = uploadResults.filter((r) => !r.ok);
       const uploadedEntries = uploadResults.filter((r) => r.ok).map((r) => r.value);
-      if (uploadFailed.length > 0) {
-        new Notice(`⚠️ ${uploadFailed.length} file(s) failed to upload.`, 8000);
+      if (uploadFailed.length > 0)
+        new Notice(`${uploadFailed.length} file(s) failed to upload.`, 8000);
+
+      // Abort if all uploads failed — don't create an empty commit
+      if (uploadedEntries.length === 0 && changed.length > 0) {
+        status.setMessage("Push failed — no files could be uploaded.");
+        setTimeout(() => status.hide(), 8000);
+        this._updateStatusBar("error", "Upload failed");
+        return;
       }
 
-      // 5. Build tree
       const treeItems = [
         ...unchanged.map((f) => ({ path: f.path, mode: "100644", type: "blob", sha: remoteShaMap[f.path] })),
         ...uploadedEntries.map((f) => ({ path: f.path, mode: "100644", type: "blob", sha: f.sha })),
       ];
 
-      // 6. Commit
       const deletionMsg = toDeleteRemotely.length > 0 ? ` (removing ${toDeleteRemotely.length} file(s))` : "";
       status.setMessage(`Push: creating commit${deletionMsg}…`);
       const newTreeSha = await client.createTree(treeSha, treeItems, toDeleteRemotely);
@@ -1273,9 +1485,9 @@ class DirectGitHubSyncPlugin extends Plugin {
       status.setMessage("Push: updating branch…");
       await client.updateRef(newCommitSha);
 
-      // 7. Cache
       const newCache = {};
       for (const item of treeItems) newCache[item.path] = item.sha;
+      for (const e of uploadedEntries) newCache[e.path] = e.sha; // blob SHA takes precedence
       for (const dp of toDeleteRemotely) delete newCache[dp];
       this.settings.syncCache = newCache;
       this.settings.lastKnownRemoteCommit = newCommitSha;
@@ -1293,27 +1505,26 @@ class DirectGitHubSyncPlugin extends Plugin {
     } catch (e) {
       console.error("[DGS] Push error:", e);
       status.setMessage(`Push failed: ${e.message}`);
-      this._updateStatusBar("error", e.message);
+      if (e.status === 0) this._updateStatusBar("offline");
+      else this._updateStatusBar("error", e.message);
       setTimeout(() => status.hide(), 12000);
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  //  PULL  (GitHub → Local)  — with local SHA protection
+  //  PULL  (GitHub → Local)
   // ─────────────────────────────────────────────────────────────────────
 
   async pull() {
     try { this._validate(); } catch (e) { new Notice(e.message, 8000); return; }
 
     const client = this._client();
-    const concurrency = this.settings.concurrency || 5;
+    const concurrency = Math.max(1, this.settings.concurrency || 5);
     const status = new Notice("Pull: connecting…", 0);
 
     try {
-      // 0. Bootstrap empty repo
       await client.initRepoIfNeeded();
 
-      // 1. Fetch remote
       status.setMessage("Pull: fetching repository state…");
       const { commitSha, treeSha } = await client.getLatestCommit();
       const tree = await client.getFullTree(treeSha);
@@ -1324,7 +1535,6 @@ class DirectGitHubSyncPlugin extends Plugin {
         return n.type === "blob" && !shouldIgnorePath(p, this.settings);
       });
 
-      // 2. Delta check
       const cache = this.settings.syncCache || {};
       const changed = blobs.filter((n) => cache[normalisePath(n.path)] !== n.sha);
       const remotePathSet = new Set(blobs.map((n) => normalisePath(n.path)));
@@ -1343,7 +1553,7 @@ class DirectGitHubSyncPlugin extends Plugin {
         return;
       }
 
-      // 3. Ensure folders
+      // Ensure parent folders exist
       for (const folder of folders) {
         const fp = normalisePath(folder.path);
         if (shouldIgnorePath(fp, this.settings)) continue;
@@ -1352,10 +1562,9 @@ class DirectGitHubSyncPlugin extends Plugin {
         }
       }
 
-      // 4. Download — with local SHA protection
+      // Download — with local SHA protection
       const skippedConflicts = [];
       if (changed.length > 0) status.setMessage(`Pull: downloading ${changed.length} file(s)…`);
-
       let written = 0;
       const newCache = Object.assign({}, cache);
 
@@ -1363,17 +1572,16 @@ class DirectGitHubSyncPlugin extends Plugin {
         const fp = normalisePath(node.path);
         const existing = this.app.vault.getAbstractFileByPath(fp);
 
-        // ── FIX: Check local SHA before overwriting ──
+        // Protect files with un-pushed local edits
         if (existing && cache[fp]) {
           try {
             const localBuf = await this.app.vault.readBinary(existing);
             const localSha = await computeGitBlobSha(localBuf);
             if (localSha !== cache[fp]) {
-              // Local has un-pushed edits — do NOT overwrite
               skippedConflicts.push(fp);
               return { path: fp, skipped: true };
             }
-          } catch { /* couldn't read — allow overwrite */ }
+          } catch { /* can't read — allow overwrite */ }
         }
 
         const b64 = await client.getBlob(node.sha);
@@ -1392,26 +1600,26 @@ class DirectGitHubSyncPlugin extends Plugin {
           await this.app.vault.createBinary(fp, buf);
         }
         written++;
-        status.setMessage(`Pull: downloaded ${written}/${changed.length}…`);
+        status.setMessage(`Pull: downloading… ${written}/${changed.length}`);
         return { path: fp, sha: node.sha };
       });
 
       const downloadFailed = downloadResults.filter((r) => !r.ok);
-      const downloadedEntries = downloadResults.filter((r) => r.ok && !r.value.skipped).map((r) => r.value);
+      const downloadedEntries = downloadResults
+        .filter((r) => r.ok && !r.value.skipped)
+        .map((r) => r.value);
       for (const entry of downloadedEntries) newCache[entry.path] = entry.sha;
 
       if (skippedConflicts.length > 0) {
         new Notice(
-          `⚡ ${skippedConflicts.length} file(s) have local edits and were NOT overwritten:\n${skippedConflicts.join(", ")}\n\nUse Sync to resolve conflicts.`,
+          `${skippedConflicts.length} file(s) have unpushed local edits and were NOT overwritten:\n${skippedConflicts.join("\n")}\n\nUse Sync to resolve conflicts.`,
           12000
         );
       }
+      if (downloadFailed.length > 0)
+        new Notice(`${downloadFailed.length} file(s) failed to download.`, 8000);
 
-      if (downloadFailed.length > 0) {
-        new Notice(`⚠️ ${downloadFailed.length} file(s) failed to download.`, 8000);
-      }
-
-      // 5. Delete — with local SHA protection
+      // Delete locally — with local SHA protection
       let deleted = 0;
       const deleteSkipped = [];
 
@@ -1421,16 +1629,15 @@ class DirectGitHubSyncPlugin extends Plugin {
           try {
             const existing = this.app.vault.getAbstractFileByPath(fp);
             if (existing) {
-              // ── FIX: Check local SHA before deleting ──
               if (cache[fp]) {
                 try {
                   const localBuf = await this.app.vault.readBinary(existing);
                   const localSha = await computeGitBlobSha(localBuf);
                   if (localSha !== cache[fp]) {
                     deleteSkipped.push(fp);
-                    continue; // local has edits — don't delete
+                    continue;
                   }
-                } catch { /* couldn't read — allow delete */ }
+                } catch { /* can't read — allow delete */ }
               }
               await this.app.vault.trash(existing, true);
             }
@@ -1442,19 +1649,17 @@ class DirectGitHubSyncPlugin extends Plugin {
         }
         if (deleteSkipped.length > 0) {
           new Notice(
-            `⚡ ${deleteSkipped.length} file(s) were NOT deleted because they have local edits:\n${deleteSkipped.join(", ")}`,
+            `${deleteSkipped.length} file(s) were NOT deleted — they have local edits:\n${deleteSkipped.join("\n")}`,
             10000
           );
         }
       }
 
-      // 6. Persist
       this.settings.syncCache = newCache;
       this.settings.lastKnownRemoteCommit = commitSha;
       this.settings.lastSyncTime = Date.now();
       await this.saveSettings();
 
-      // Summary
       const summary = [];
       if (written > 0) summary.push(`${written} downloaded`);
       if (deleted > 0) summary.push(`${deleted} deleted locally`);
@@ -1469,14 +1674,15 @@ class DirectGitHubSyncPlugin extends Plugin {
     } catch (e) {
       console.error("[DGS] Pull error:", e);
       status.setMessage(`Pull failed: ${e.message}`);
-      this._updateStatusBar("error", e.message);
+      if (e.status === 0) this._updateStatusBar("offline");
+      else this._updateStatusBar("error", e.message);
       setTimeout(() => status.hide(), 12000);
     }
   }
 }
 
 // ─────────────────────────────────────────────
-//  Settings Tab  (redesigned)
+//  Settings Tab
 // ─────────────────────────────────────────────
 
 class DirectGitHubSyncSettingTab extends PluginSettingTab {
@@ -1486,6 +1692,9 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     this._draft = {};
     this._validationEl = null;
     this._saveBtn = null;
+    this._configureBtn = null;
+    this._connectionPanelEl = null;
+    this._connectionOpen = false;
   }
 
   _initDraft() {
@@ -1495,8 +1704,12 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
   _isDirty() {
     const s = this.plugin.settings;
-    return this._draft.pat !== s.pat || this._draft.username !== s.username ||
-      this._draft.repo !== s.repo || this._draft.branch !== s.branch;
+    return (
+      this._draft.pat !== s.pat ||
+      this._draft.username !== s.username ||
+      this._draft.repo !== s.repo ||
+      this._draft.branch !== s.branch
+    );
   }
 
   display() {
@@ -1508,7 +1721,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     // ── Plugin Header ──────────────────────────────────────────────────
     const headerEl = containerEl.createDiv({ cls: "dgs-settings-header" });
     const headerIcon = headerEl.createSpan({ cls: "dgs-settings-header-icon" });
-    setIcon(headerIcon, "git-branch");
+    try { setIcon(headerIcon, "git-branch"); } catch { headerIcon.setText("G"); }
     const headerText = headerEl.createDiv();
     headerText.createEl("h2", { text: "Direct GitHub Sync" });
     headerText.createEl("p", {
@@ -1517,66 +1730,25 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     });
 
     // ══════════════════════════════════════════════════════════════════
-    //  Section 1 — Connection
+    //  Section 1 — Connection  (collapsed behind a Configure button)
     // ══════════════════════════════════════════════════════════════════
     this._createSectionHeader(containerEl, "lock", "Connection");
 
-    const authNote = containerEl.createEl("p", { cls: "setting-item-description dgs-section-note" });
-    authNote.innerHTML = "These settings are applied when you click <strong>Save Connection Settings</strong>.";
+    // Status summary — always visible
+    this._renderConnectionStatus(containerEl);
 
-    // PAT
-    new Setting(containerEl)
-      .setName("Personal Access Token (PAT)")
-      .setDesc("GitHub → Settings → Developer settings → Personal access tokens. Needs 'repo' scope.")
-      .addText((text) => {
-        text.inputEl.type = "password";
-        text.inputEl.autocomplete = "off";
-        text.setPlaceholder("ghp_xxxxxxxxxxxxxxxxxxxx")
-          .setValue(this._draft.pat)
-          .onChange((v) => { this._draft.pat = v.trim(); this._updateSaveBtnState(); });
-      });
+    // "Configure Connection" button — toggles fields
+    new Setting(containerEl).addButton((btn) => {
+      this._configureBtn = btn;
+      btn
+        .setButtonText(this._connectionOpen ? "Close Configuration" : "Configure Connection")
+        .onClick(() => this._toggleConnectionPanel());
+    });
 
-    // Username
-    new Setting(containerEl)
-      .setName("GitHub Username / Organisation")
-      .setDesc("The account that owns the repository.")
-      .addText((text) =>
-        text.setPlaceholder("octocat").setValue(this._draft.username)
-          .onChange((v) => { this._draft.username = v.trim(); this._updateSaveBtnState(); })
-      );
-
-    // Repo
-    new Setting(containerEl)
-      .setName("Repository Name")
-      .setDesc("Repository name only — not a URL.")
-      .addText((text) =>
-        text.setPlaceholder("my-obsidian-vault").setValue(this._draft.repo)
-          .onChange((v) => { this._draft.repo = v.trim(); this._updateSaveBtnState(); })
-      );
-
-    // Branch
-    new Setting(containerEl)
-      .setName("Branch")
-      .setDesc("Target branch. Leave blank for 'main'.")
-      .addText((text) =>
-        text.setPlaceholder("main").setValue(this._draft.branch)
-          .onChange((v) => { this._draft.branch = v.trim() || "main"; this._updateSaveBtnState(); })
-      );
-
-    // Validation panel
-    this._validationEl = containerEl.createDiv({ cls: "dgs-validation-result dgs-hidden" });
-
-    // Save + Test
-    const actionSetting = new Setting(containerEl);
-    actionSetting
-      .addButton((btn) => {
-        this._saveBtn = btn;
-        btn.setButtonText("Save Connection Settings").setCta()
-          .onClick(() => this._saveCredentials());
-      })
-      .addButton((btn) =>
-        btn.setButtonText("Test Connection").onClick(() => this._testConnection())
-      );
+    // Collapsible panel
+    this._connectionPanelEl = containerEl.createDiv({ cls: "dgs-connection-panel" });
+    if (!this._connectionOpen) this._connectionPanelEl.addClass("dgs-hidden");
+    this._renderConnectionFields(this._connectionPanelEl);
 
     // ══════════════════════════════════════════════════════════════════
     //  Section 2 — Sync Behaviour
@@ -1587,75 +1759,103 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
       .setName("Ignore .obsidian directory")
       .setDesc("Prevents plugin configs and workspace state from syncing.")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.ignoreObsidianDir)
-          .onChange(async (v) => { this.plugin.settings.ignoreObsidianDir = v; await this.plugin.saveSettings(); })
+        toggle.setValue(this.plugin.settings.ignoreObsidianDir).onChange(async (v) => {
+          this.plugin.settings.ignoreObsidianDir = v;
+          await this.plugin.saveSettings();
+        })
       );
 
     new Setting(containerEl)
       .setName("Ignored paths")
-      .setDesc("One path per line. Supports wildcards (*). Lines starting with # are comments. Paths ending with / match directories.")
+      .setDesc(
+        "One path per line. Supports wildcards (*). Lines starting with # are comments. " +
+          "Paths ending with / match directories."
+      )
       .addTextArea((text) => {
-        text.setPlaceholder("Attachments/large-videos/\n*.mp4\n# Comment lines are ignored")
+        text
+          .setPlaceholder("Attachments/large-videos/\n*.mp4\n# Comment lines are ignored")
           .setValue(this.plugin.settings.ignoredPaths || "")
-          .onChange(async (v) => { this.plugin.settings.ignoredPaths = v; await this.plugin.saveSettings(); });
+          .onChange(async (v) => {
+            this.plugin.settings.ignoredPaths = v;
+            await this.plugin.saveSettings();
+          });
         text.inputEl.rows = 5;
         text.inputEl.addClass("dgs-ignored-paths-textarea");
       });
 
     new Setting(containerEl)
       .setName("Device name (optional)")
-      .setDesc("Shown in commit messages, e.g. \"Vault sync from PC: 20 Apr 2026 at 14:03\".")
+      .setDesc('Shown in commit messages, e.g. "Vault sync from PC: 20 Apr 2026 at 14:03".')
       .addText((text) =>
-        text.setPlaceholder("e.g. PC, Phone, Laptop").setValue(this.plugin.settings.deviceName || "")
-          .onChange(async (v) => { this.plugin.settings.deviceName = v.trim(); await this.plugin.saveSettings(); })
-      );
-
-    new Setting(containerEl)
-      .setName("Concurrent requests")
-      .setDesc("Number of parallel API calls. Higher = faster but risks rate limits. Default: 5.")
-      .addSlider((slider) =>
-        slider.setLimits(1, 10, 1).setValue(this.plugin.settings.concurrency ?? 5)
-          .setDynamicTooltip()
-          .onChange(async (v) => { this.plugin.settings.concurrency = v; await this.plugin.saveSettings(); })
-      );
-
-    // ══════════════════════════════════════════════════════════════════
-    //  Section 3 — Auto-Sync
-    // ══════════════════════════════════════════════════════════════════
-    this._createSectionHeader(containerEl, "refresh-cw", "Auto-Sync");
-
-    containerEl.createEl("p", {
-      text: "When enabled, changes are automatically synced after a period of inactivity. Uses the three-way sync engine with conflict detection.",
-      cls: "setting-item-description dgs-section-note",
-    });
-
-    new Setting(containerEl)
-      .setName("Enable auto-sync")
-      .setDesc("Automatically sync after idle time. Conflicts will be shown for resolution.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoSyncEnabled)
+        text
+          .setPlaceholder("e.g. PC, Phone, Laptop")
+          .setValue(this.plugin.settings.deviceName || "")
           .onChange(async (v) => {
-            this.plugin.settings.autoSyncEnabled = v;
+            this.plugin.settings.deviceName = v.trim();
             await this.plugin.saveSettings();
-            new Notice(v ? "Auto-sync enabled. Restart Obsidian to activate." : "Auto-sync disabled.", 4000);
           })
       );
 
     new Setting(containerEl)
-      .setName("Auto-sync interval (minutes)")
-      .setDesc("Minutes of inactivity before auto-sync triggers. Range: 1–30.")
+      .setName("Concurrent requests")
+      .setDesc("Number of parallel API calls. Higher is faster but risks rate limits. Default: 5.")
       .addSlider((slider) =>
-        slider.setLimits(1, 30, 1).setValue(this.plugin.settings.autoSyncInterval ?? 5)
+        slider
+          .setLimits(1, 10, 1)
+          .setValue(this.plugin.settings.concurrency ?? 5)
           .setDynamicTooltip()
-          .onChange(async (v) => { this.plugin.settings.autoSyncInterval = v; await this.plugin.saveSettings(); })
+          .onChange(async (v) => {
+            this.plugin.settings.concurrency = v;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 3 — Smart Sync
+    // ══════════════════════════════════════════════════════════════════
+    this._createSectionHeader(containerEl, "refresh-cw", "Smart Sync");
+
+    containerEl.createEl("p", {
+      text: "When enabled, changes are automatically synced after a period of inactivity. Before running, it checks whether remote has actually changed to avoid unnecessary API traffic. Conflicts are surfaced in the status bar rather than interrupting your work.",
+      cls: "setting-item-description dgs-section-note",
+    });
+
+    new Setting(containerEl)
+      .setName("Enable smart sync")
+      .setDesc("Sync automatically after the idle period. Conflicts appear in the status bar.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.autoSyncEnabled).onChange(async (v) => {
+          this.plugin.settings.autoSyncEnabled = v;
+          await this.plugin.saveSettings();
+          new Notice(
+            v ? "Smart sync enabled. Restart Obsidian to activate." : "Smart sync disabled.",
+            4000
+          );
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Idle interval (minutes)")
+      .setDesc("Minutes of inactivity before smart sync triggers. Range: 1–30.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(1, 30, 1)
+          .setValue(this.plugin.settings.autoSyncInterval ?? 5)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.autoSyncInterval = v;
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)
       .setName("Sync on startup")
-      .setDesc("Run a sync when Obsidian starts (only if auto-sync is enabled).")
+      .setDesc("Run a sync when Obsidian starts (only if smart sync is enabled).")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncOnStartup)
-          .onChange(async (v) => { this.plugin.settings.syncOnStartup = v; await this.plugin.saveSettings(); })
+        toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (v) => {
+          this.plugin.settings.syncOnStartup = v;
+          await this.plugin.saveSettings();
+        })
       );
 
     // ══════════════════════════════════════════════════════════════════
@@ -1667,25 +1867,18 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
       .setName("Sync with GitHub")
       .setDesc("Full bidirectional sync — downloads remote changes, uploads local changes, detects conflicts.")
       .addButton((btn) =>
-        btn.setButtonText("Sync Now").setCta()
-          .onClick(() => this.plugin.sync())
+        btn.setButtonText("Sync Now").setCta().onClick(() => this.plugin.sync())
       );
 
     new Setting(containerEl)
       .setName("Push to GitHub")
       .setDesc("Upload local changes only. Warns if remote has newer commits.")
-      .addButton((btn) =>
-        btn.setButtonText("Push Now")
-          .onClick(() => this.plugin.push())
-      );
+      .addButton((btn) => btn.setButtonText("Push Now").onClick(() => this.plugin.push()));
 
     new Setting(containerEl)
       .setName("Pull from GitHub")
       .setDesc("Download remote changes only. Protects files with un-pushed local edits.")
-      .addButton((btn) =>
-        btn.setButtonText("Pull Now")
-          .onClick(() => this.plugin.pull())
-      );
+      .addButton((btn) => btn.setButtonText("Pull Now").onClick(() => this.plugin.pull()));
 
     // ══════════════════════════════════════════════════════════════════
     //  Section 5 — Danger Zone
@@ -1694,16 +1887,21 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Reset sync cache")
-      .setDesc("Clears the SHA cache and commit cursor. The next sync will do a full comparison. Use after a manual repo reset.")
+      .setDesc(
+        "Clears the SHA cache and commit cursor. The next sync will be a full comparison. " +
+          "Use after a manual repository reset."
+      )
       .addButton((btn) =>
-        btn.setButtonText("Reset Cache").setWarning()
+        btn
+          .setButtonText("Reset Cache")
+          .setWarning()
           .onClick(async () => {
             this.plugin.settings.syncCache = {};
             this.plugin.settings.lastPulledShas = {};
             this.plugin.settings.lastKnownRemoteCommit = "";
             this.plugin.settings.lastSyncTime = 0;
             await this.plugin.saveSettings();
-            new Notice("Sync cache cleared. Next sync will be a full sync.", 5000);
+            new Notice("Sync cache cleared. Next sync will be a full comparison.", 5000);
           })
       );
 
@@ -1715,28 +1913,126 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     });
   }
 
-  /** Create a styled section header with an icon */
+  /** Always-visible connection status line */
+  _renderConnectionStatus(container) {
+    const s = this.plugin.settings;
+    const isConfigured = !!(s.pat && s.username && s.repo && s.branch);
+
+    const statusEl = container.createDiv({ cls: "dgs-connection-status" });
+    const iconEl = statusEl.createSpan({ cls: "dgs-connection-status-icon" });
+    const textEl = statusEl.createSpan({ cls: "dgs-connection-status-text" });
+
+    if (isConfigured) {
+      statusEl.addClass("dgs-connection-status--ok");
+      try { setIcon(iconEl, "check-circle-2"); } catch { iconEl.setText("ok"); }
+      textEl.setText(`${s.username}/${s.repo}  •  branch: ${s.branch}`);
+    } else {
+      statusEl.addClass("dgs-connection-status--warn");
+      try { setIcon(iconEl, "alert-circle"); } catch { iconEl.setText("!"); }
+      textEl.setText("Connection not configured — click Configure Connection below.");
+    }
+  }
+
+  _toggleConnectionPanel() {
+    this._connectionOpen = !this._connectionOpen;
+    if (this._connectionPanelEl) {
+      if (this._connectionOpen) this._connectionPanelEl.removeClass("dgs-hidden");
+      else this._connectionPanelEl.addClass("dgs-hidden");
+    }
+    if (this._configureBtn) {
+      this._configureBtn.setButtonText(
+        this._connectionOpen ? "Close Configuration" : "Configure Connection"
+      );
+    }
+  }
+
+  _renderConnectionFields(panel) {
+    const authNote = panel.createEl("p", { cls: "setting-item-description dgs-section-note" });
+    authNote.innerHTML =
+      "Changes are applied when you click <strong>Save Connection Settings</strong>.";
+
+    new Setting(panel)
+      .setName("Personal Access Token (PAT)")
+      .setDesc("GitHub → Settings → Developer settings → Personal access tokens. Needs 'repo' scope.")
+      .addText((text) => {
+        text.inputEl.type = "password";
+        text.inputEl.autocomplete = "off";
+        text.inputEl.spellcheck = false;
+        text
+          .setPlaceholder("ghp_xxxxxxxxxxxxxxxxxxxx")
+          .setValue(this._draft.pat)
+          .onChange((v) => { this._draft.pat = v.trim(); this._updateSaveBtnState(); });
+      });
+
+    new Setting(panel)
+      .setName("GitHub Username / Organisation")
+      .setDesc("The account that owns the repository.")
+      .addText((text) =>
+        text
+          .setPlaceholder("octocat")
+          .setValue(this._draft.username)
+          .onChange((v) => { this._draft.username = v.trim(); this._updateSaveBtnState(); })
+      );
+
+    new Setting(panel)
+      .setName("Repository Name")
+      .setDesc("Repository name only — not a URL.")
+      .addText((text) =>
+        text
+          .setPlaceholder("my-obsidian-vault")
+          .setValue(this._draft.repo)
+          .onChange((v) => { this._draft.repo = v.trim(); this._updateSaveBtnState(); })
+      );
+
+    new Setting(panel)
+      .setName("Branch")
+      .setDesc("Target branch. Defaults to 'main' if left blank.")
+      .addText((text) =>
+        text
+          .setPlaceholder("main")
+          .setValue(this._draft.branch)
+          .onChange((v) => { this._draft.branch = v.trim() || "main"; this._updateSaveBtnState(); })
+      );
+
+    this._validationEl = panel.createDiv({ cls: "dgs-validation-result dgs-hidden" });
+
+    const actionSetting = new Setting(panel);
+    actionSetting
+      .addButton((btn) => {
+        this._saveBtn = btn;
+        btn
+          .setButtonText("Save Connection Settings")
+          .setCta()
+          .onClick(() => this._saveCredentials());
+      })
+      .addButton((btn) =>
+        btn.setButtonText("Test Connection").onClick(() => this._testConnection())
+      );
+  }
+
   _createSectionHeader(container, icon, title) {
     const header = container.createDiv({ cls: "dgs-section-header" });
     const iconEl = header.createSpan({ cls: "dgs-section-icon" });
-    try { setIcon(iconEl, icon); } catch { iconEl.setText("●"); }
+    try { setIcon(iconEl, icon); } catch { iconEl.setText("•"); }
     header.createEl("h3", { text: title });
   }
 
   _updateSaveBtnState() {
     if (!this._saveBtn) return;
-    this._saveBtn.setButtonText(this._isDirty() ? "Save Connection Settings ●" : "Save Connection Settings");
+    this._saveBtn.setButtonText(
+      this._isDirty() ? "Save Connection Settings (unsaved)" : "Save Connection Settings"
+    );
   }
 
   async _saveCredentials() {
     const d = this._draft;
     const issues = [];
-    if (!d.pat) issues.push("PAT is required.");
-    if (!d.username) issues.push("Username is required.");
-    if (!d.repo) issues.push("Repository is required.");
+    if (!d.pat) issues.push("Personal Access Token is required.");
+    if (!d.username) issues.push("GitHub username is required.");
+    if (!d.repo) issues.push("Repository name is required.");
     if (!d.branch) issues.push("Branch is required.");
     if (d.pat && !/^(ghp_|github_pat_|gho_|ghs_|ghr_)/.test(d.pat))
-      issues.push("PAT format looks incorrect.");
+      issues.push("PAT format looks incorrect — it should start with 'ghp_' or 'github_pat_'.");
     if (issues.length > 0) {
       this._showValidation("error", "Cannot save:\n• " + issues.join("\n• "));
       return;
@@ -1746,17 +2042,22 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     this.plugin.settings.username = d.username;
     this.plugin.settings.repo = d.repo;
     this.plugin.settings.branch = d.branch;
+    // Reset commit cursor so next sync does a clean comparison against the new repo
     this.plugin.settings.lastKnownRemoteCommit = "";
     await this.plugin.saveSettings();
 
     this._updateSaveBtnState();
-    this._showValidation("ok", "Connection settings saved successfully.");
-    new Notice("✅ Connection settings saved.", 3000);
+    this._showValidation("ok", "Connection settings saved.");
+    new Notice("Connection settings saved.", 3000);
   }
 
   async _testConnection() {
     if (this._isDirty()) {
       this._showValidation("error", "You have unsaved changes. Save first, then test.");
+      return;
+    }
+    if (!this.plugin._isConfigured()) {
+      this._showValidation("error", "Connection is not configured. Fill in all fields and save first.");
       return;
     }
     this._showValidation("info", "Testing connection…");
@@ -1769,15 +2070,25 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     }
   }
 
+  /** Show a validation result using SVG icons (no emojis). */
   _showValidation(type, message) {
     const el = this._validationEl;
     if (!el) return;
     el.className = "dgs-validation-result";
     el.removeClass("dgs-hidden");
-    const icons = { ok: "✅", error: "❌", info: "⏳" };
+
+    const svgIcons = {
+      ok:    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+      error: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+      info:  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+    };
     const cls = { ok: "dgs-ok", error: "dgs-err", info: "dgs-info" };
     el.addClass(cls[type] || "dgs-info");
-    el.setText(`${icons[type] || "ℹ️"} ${message}`);
+    el.empty();
+
+    const iconWrap = el.createSpan({ cls: "dgs-validation-icon" });
+    iconWrap.innerHTML = svgIcons[type] || svgIcons.info;
+    el.createSpan({ text: "\u00a0" + message, cls: "dgs-validation-text" });
   }
 }
 

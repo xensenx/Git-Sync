@@ -74,5 +74,10 @@ If you wish to modify the source code, the project is structured modularly and b
 
 ## Support this Project by donating
 
-[![Support me on Ko-fi](https://ko-fi.com)](https://ko-fi.com/xensenx)
+<p align="center">
+  <a href="https://ko-fi.com/xensenx">
+    <img src="https://ko-fi.com" height="36" style="border:0px;height:36px;" alt="Support me on Ko-fi" />
+  </a>
+</p>
+
 

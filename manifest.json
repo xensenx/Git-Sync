@@ -1,0 +1,10 @@
+{
+  "id": "direct-github-sync",
+  "name": "Direct GitHub Sync",
+  "version": "2.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Push and pull your entire vault to/from a GitHub repository without Git or Node.js. Works on desktop and mobile.",
+  "author": "Sen",
+  "authorUrl": "https://github.com/xensenx",
+  "isDesktopOnly": false
+}

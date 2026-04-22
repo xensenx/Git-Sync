@@ -71,3 +71,8 @@ If you wish to modify the source code, the project is structured modularly and b
 ### Build Commands
 * `npm run dev`: Starts `esbuild` in watch mode. Any changes saved to the `src/` directory will automatically recompile into the root `main.js` file.
 * `npm run build`: Compiles a minified, production-ready `main.js` file for distribution.
+
+## Support this Project by donating
+
+[![Support me on Ko-fi](https://ko-fi.com)](https://ko-fi.com/xensenx)
+

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Start — Direct GitHub Sync</title>
+  <meta name="description" content="Quick setup guide for Direct GitHub Sync. Get your Obsidian vault syncing to GitHub in minutes.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    </span>
+    Direct GitHub Sync
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="quick-start.html" class="active">Quick Start</a></li>
+    <li><a href="beginners.html">Beginners</a></li>
+    <li><a href="troubleshoot.html">Troubleshoot</a></li>
+    <li class="nav-cta"><a href="support.html">Support</a></li>
+  </ul>
+  <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Hero -->
+  <div class="page-hero">
+    <div class="page-hero-bg"></div>
+    <div class="container">
+      <div class="section-label">For experienced users</div>
+      <h1>Quick Start</h1>
+      <p class="subtitle">Already have a GitHub account and know your way around? You'll be up and running in under two minutes.</p>
+    </div>
+  </div>
+
+  <div class="container--narrow" style="padding-bottom:5rem;">
+
+    <!-- TOC -->
+    <div class="toc">
+      <h4>On this page</h4>
+      <ol>
+        <li><a href="#install">Install the Plugin</a></li>
+        <li><a href="#pat">Personal Access Token</a></li>
+        <li><a href="#settings">Configure Settings</a></li>
+        <li><a href="#first-sync">First Sync</a></li>
+        <li><a href="#settings-ref">Settings Reference</a></li>
+      </ol>
+    </div>
+
+    <!-- Step 1 -->
+    <section id="install" style="margin-bottom:3rem;">
+      <div class="section-label">Step 1</div>
+      <h2 class="mb-2">Install the Plugin</h2>
+      <p class="mb-3">The plugin is not yet on the Community Plugins browser, so install manually:</p>
+
+      <ol style="color:var(--text-secondary);line-height:2;">
+        <li>Download <code>main.js</code>, <code>manifest.json</code>, and <code>styles.css</code> from the <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub repo</a>.</li>
+        <li>Create the folder <code>&lt;vault&gt;/.obsidian/plugins/direct-github-sync/</code></li>
+        <li>Drop all three files into that folder.</li>
+        <li>In Obsidian → <strong>Settings → Community Plugins</strong>, disable Safe Mode if needed, then enable <strong>Direct GitHub Sync</strong>.</li>
+      </ol>
+
+      <div class="callout callout--tip mt-2">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Tip</strong>
+          <p>On mobile, use a file manager app (e.g. Files on iOS, solid explorer on Android) to navigate to your vault folder and create the plugin directory.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section id="pat" style="margin-bottom:3rem;">
+      <div class="section-label">Step 2</div>
+      <h2 class="mb-2">Personal Access Token</h2>
+      <p class="mb-3">DGS authenticates via a GitHub PAT with <code>repo</code> scope (or <code>public_repo</code> for public repos only).</p>
+
+      <ol style="color:var(--text-secondary);line-height:2.2;">
+        <li>Go to <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></li>
+        <li>Click <strong>Generate new token (classic)</strong></li>
+        <li>Set a note, choose expiry, tick <strong>repo</strong> scope</li>
+        <li>Click <strong>Generate token</strong> — copy it immediately, it won't show again</li>
+      </ol>
+
+      <div class="callout callout--warning mt-2">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-body">
+          <strong>Store it safely</strong>
+          <p>Treat your PAT like a password. Keep it in a password manager. If it leaks, revoke it immediately from GitHub Settings.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3 -->
+    <section id="settings" style="margin-bottom:3rem;">
+      <div class="section-label">Step 3</div>
+      <h2 class="mb-2">Configure Settings</h2>
+      <p class="mb-3">Open <strong>Settings → Direct GitHub Sync</strong> and fill in:</p>
+
+      <div class="code-block mb-3">
+        <div class="code-block-header">
+          <span>Required Fields</span>
+        </div>
+        <pre>GitHub PAT      →  ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GitHub Username →  your-github-username
+Repository Name →  your-vault-repo
+Branch          →  main  (or master, or whatever you use)</pre>
+      </div>
+
+      <p class="mb-3">Optional but recommended:</p>
+      <div class="code-block">
+        <div class="code-block-header"><span>Optional Fields</span></div>
+        <pre>Device Name     →  MacBook / Phone / etc.
+Auto-Sync       →  Enable + set idle interval (minutes)
+Sync on Startup →  ✓ Enabled
+Ignore .obsidian→  ✓ Enabled (default)</pre>
+      </div>
+    </section>
+
+    <!-- Step 4 -->
+    <section id="first-sync" style="margin-bottom:3rem;">
+      <div class="section-label">Step 4</div>
+      <h2 class="mb-2">First Sync</h2>
+      <p class="mb-3">Click the sync icon in the left ribbon, or open the Command Palette (<kbd>Ctrl/Cmd + P</kbd>) and run <code>Direct GitHub Sync: Sync Now</code>.</p>
+
+      <p>On first sync:</p>
+      <ul style="color:var(--text-secondary);line-height:2;margin-top:0.5rem;">
+        <li>If the repo is <strong>empty</strong> — your vault is pushed as the initial commit.</li>
+        <li>If the repo has <strong>existing files</strong> — they're pulled down and merged with your local vault.</li>
+        <li>If the repo <strong>doesn't exist yet</strong> — create it on GitHub first (can be private), then sync.</li>
+      </ul>
+    </section>
+
+    <!-- Settings Reference -->
+    <section id="settings-ref" style="margin-bottom:3rem;">
+      <div class="section-label">Reference</div>
+      <h2 class="mb-3">Settings Reference</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>GitHub PAT</h4>
+            <span class="badge badge--purple">Required</span>
+          </div>
+          <p style="font-size:0.88rem;">Your Personal Access Token. Must have <code>repo</code> scope for private repos, <code>public_repo</code> for public only.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Username</h4>
+            <span class="badge badge--purple">Required</span>
+          </div>
+          <p style="font-size:0.88rem;">Your exact GitHub username, case-sensitive. Used to construct API endpoints.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Repository</h4>
+            <span class="badge badge--purple">Required</span>
+          </div>
+          <p style="font-size:0.88rem;">The repository name (not the full URL). E.g. <code>my-obsidian-vault</code></p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Branch</h4>
+            <span class="badge badge--amber">Default: main</span>
+          </div>
+          <p style="font-size:0.88rem;">Which branch to sync to. Defaults to <code>main</code>. Change to <code>master</code> or any custom branch as needed.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Ignored Paths</h4>
+            <span class="badge badge--green">Optional</span>
+          </div>
+          <p style="font-size:0.88rem;">One rule per line. Supports exact paths, directory prefixes (<code>private/</code>), and glob wildcards (<code>*.canvas</code>). <code>.obsidian/</code> has its own toggle above.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Device Name</h4>
+            <span class="badge badge--green">Optional</span>
+          </div>
+          <p style="font-size:0.88rem;">Appears in commit messages as <code>Vault sync from MacBook: 22 Apr 2026 at 14:30</code>. Helps identify which device made a change.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Auto Sync + Interval</h4>
+            <span class="badge badge--green">Optional</span>
+          </div>
+          <p style="font-size:0.88rem;">When enabled, DGS fires a sync after the vault has been idle for the specified number of minutes. Defaults to 5 minutes.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Sync on Startup</h4>
+            <span class="badge badge--amber">Default: on</span>
+          </div>
+          <p style="font-size:0.88rem;">Automatically pulls from remote when Obsidian launches. Keeps your vault current before you start editing.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-1">
+            <h4>Concurrency</h4>
+            <span class="badge badge--amber">Default: 5</span>
+          </div>
+          <p style="font-size:0.88rem;">How many files to upload/download simultaneously. Reduce to 2–3 on slower connections or if you hit rate limits.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="callout callout--info">
+      <span class="callout-icon">ℹ️</span>
+      <div class="callout-body">
+        <strong>Running into issues?</strong>
+        <p>Check the <a href="troubleshoot.html">Troubleshoot page</a> for a full list of errors and their fixes.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">Direct GitHub Sync</span>
+        <span class="footer-meta">by Sen · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="troubleshoot.html">Troubleshoot</a>
+        <a href="support.html">Support</a>
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Troubleshoot — Direct GitHub Sync</title>
+  <meta name="description" content="Common errors and fixes for Direct GitHub Sync Obsidian plugin.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    </span>
+    Direct GitHub Sync
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="quick-start.html">Quick Start</a></li>
+    <li><a href="beginners.html">Beginners</a></li>
+    <li><a href="troubleshoot.html" class="active">Troubleshoot</a></li>
+    <li class="nav-cta"><a href="support.html">Support</a></li>
+  </ul>
+  <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Hero -->
+  <div class="page-hero">
+    <div class="page-hero-bg"></div>
+    <div class="container">
+      <div class="section-label">Help</div>
+      <h1>Troubleshoot</h1>
+      <p class="subtitle">Common errors, what they mean, and exactly how to fix them. Click any error to expand.</p>
+    </div>
+  </div>
+
+  <div class="container--narrow" style="padding-bottom:5rem;">
+
+    <!-- TOC -->
+    <div class="toc">
+      <h4>Jump to section</h4>
+      <ol>
+        <li><a href="#auth-errors">Authentication Errors</a></li>
+        <li><a href="#repo-errors">Repository Errors</a></li>
+        <li><a href="#sync-errors">Sync Errors</a></li>
+        <li><a href="#mobile-errors">Mobile Issues</a></li>
+        <li><a href="#common-mistakes">Common Mistakes</a></li>
+      </ol>
+    </div>
+
+    <!-- Auth Errors -->
+    <section id="auth-errors" style="margin:3rem 0;">
+      <div class="section-label">Authentication</div>
+      <h2 class="mb-3">Authentication Errors</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">401</span>
+            <span class="error-title">Authentication failed — your PAT is invalid or expired</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">Your Personal Access Token is wrong, expired, or was deleted.</p>
+            <p><strong>Fix:</strong> Go to <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a>, check if your token exists and hasn't expired. If it has, generate a new one (see the <a href="beginners.html#create-pat">Beginners Guide</a>) and paste it into the plugin settings.</p>
+            <div class="callout callout--tip mt-2">
+              <span class="callout-icon">💡</span>
+              <div class="callout-body"><p>Double-check for accidental spaces before or after the token when pasting. Clear the field and re-paste carefully.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">403</span>
+            <span class="error-title">Access forbidden — PAT may lack 'repo' scope</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">Your token exists but doesn't have permission to access this repository.</p>
+            <p><strong>Fix:</strong> Go to your token settings on GitHub and check the scopes. You need the <code>repo</code> scope for private repositories. If you only checked <code>public_repo</code>, you won't be able to sync a private repo. Generate a new token with full <code>repo</code> scope.</p>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">403</span>
+            <span class="error-title">GitHub rate limit exceeded</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">You've made too many requests to GitHub's API in a short time.</p>
+            <p><strong>Fix:</strong> Wait 5–10 minutes and try again. GitHub resets rate limits per hour. If this happens regularly, try reducing the <strong>Concurrency</strong> setting to 2–3 in the plugin settings, or increase the auto-sync idle interval.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Repo Errors -->
+    <section id="repo-errors" style="margin:3rem 0;">
+      <div class="section-label">Repository</div>
+      <h2 class="mb-3">Repository Errors</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">404</span>
+            <span class="error-title">Repository "username/repo" not found</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">The plugin can't find the repository you specified.</p>
+            <p><strong>Most likely causes:</strong></p>
+            <ul style="margin-top:0.5rem;line-height:2;">
+              <li>Typo in the <strong>Repository Name</strong> field — check exact capitalisation</li>
+              <li>Typo in the <strong>Username</strong> field</li>
+              <li>The repo doesn't exist yet — create it on GitHub first</li>
+              <li>The repo is private and your PAT lacks <code>repo</code> scope</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">404</span>
+            <span class="error-title">Branch "main" not found in "username/repo"</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">The plugin found your repo but the branch name doesn't match.</p>
+            <p><strong>Fix:</strong> On GitHub, look at your repo. The branch name is shown in a dropdown near the top-left (it may say <code>master</code> instead of <code>main</code>). Update the <strong>Branch</strong> field in plugin settings to match exactly.</p>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">409</span>
+            <span class="error-title">Repository is empty — will be initialised automatically</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">This is <strong>not actually an error</strong> — it's informational. Your repo exists but has no commits yet.</p>
+            <p><strong>What happens:</strong> DGS will automatically push all your local files as the initial commit. Just wait a moment and it will complete.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Sync Errors -->
+    <section id="sync-errors" style="margin:3rem 0;">
+      <div class="section-label">Sync</div>
+      <h2 class="mb-3">Sync Errors</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">Error</span>
+            <span class="error-title">Network error — check your internet connection</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">DGS couldn't reach GitHub's servers.</p>
+            <p><strong>Fix:</strong> Check your internet connection and try again. If you're on mobile, ensure Obsidian has network permissions. DGS automatically retries failed requests up to 3 times before reporting this error.</p>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">422</span>
+            <span class="error-title">GitHub rejected the request (422)</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">A file you tried to sync was rejected by GitHub.</p>
+            <p><strong>Common causes:</strong></p>
+            <ul style="margin-top:0.5rem;line-height:2;">
+              <li>A file is larger than 100 MB (GitHub's hard limit per file)</li>
+              <li>A filename contains characters GitHub doesn't allow</li>
+              <li>You're trying to push to a protected branch</li>
+            </ul>
+            <p style="margin-top:0.75rem;"><strong>Fix:</strong> Large files should be excluded via the Ignored Paths setting. Add the problematic file's path to the ignore list.</p>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">Warning</span>
+            <span class="error-title">GitHub tree truncated (repo >100k files)</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">Your repo is very large (over 100,000 files) and GitHub isn't returning all of them in a single API call.</p>
+            <p><strong>Fix:</strong> This is an edge case most users won't hit. Consider using the Ignored Paths feature to exclude large directories (e.g. an <code>attachments/</code> folder) from sync.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Mobile Errors -->
+    <section id="mobile-errors" style="margin:3rem 0;">
+      <div class="section-label">Mobile</div>
+      <h2 class="mb-3">Mobile Issues</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">iOS</span>
+            <span class="error-title">Plugin doesn't appear in the Community Plugins list</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">The plugin folder wasn't created correctly or Obsidian hasn't detected it yet.</p>
+            <p><strong>Fix:</strong></p>
+            <ul style="margin-top:0.5rem;line-height:2;">
+              <li>Use the <strong>Files</strong> app to verify the folder is at <code>&lt;vault&gt;/.obsidian/plugins/direct-github-sync/</code></li>
+              <li>Make sure all three files (<code>main.js</code>, <code>manifest.json</code>, <code>styles.css</code>) are inside that folder</li>
+              <li>Close and fully reopen Obsidian (swipe it away from the app switcher)</li>
+              <li>If using iCloud, wait for files to fully sync down before reopening Obsidian</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="error-item">
+          <div class="error-header">
+            <span class="error-badge">Mobile</span>
+            <span class="error-title">Sync works on desktop but fails on mobile</span>
+            <svg class="error-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="error-body">
+            <p class="mb-3">Settings may not have been configured on the mobile device, or the PAT has expired.</p>
+            <p><strong>Fix:</strong> Settings are per-device. Open <strong>Settings → Direct GitHub Sync</strong> on your phone and re-enter your PAT, username, repo, and branch. These are stored locally and not synced between devices for security.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Common Mistakes -->
+    <section id="common-mistakes" style="margin:3rem 0;">
+      <div class="section-label">Gotchas</div>
+      <h2 class="mb-3">Common Mistakes</h2>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-2">
+            <span style="font-size:1.2rem;">❌</span>
+            <h4>Using the repo URL instead of just the name</h4>
+          </div>
+          <p style="font-size:0.88rem;">The <strong>Repository</strong> field should contain only the repo name, e.g. <code>my-vault</code>, not <code>https://github.com/username/my-vault</code>.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-2">
+            <span style="font-size:1.2rem;">❌</span>
+            <h4>PAT doesn't have 'repo' scope</h4>
+          </div>
+          <p style="font-size:0.88rem;">If your repo is private, you must check the full <code>repo</code> checkbox when generating your token, not just <code>public_repo</code>.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-2">
+            <span style="font-size:1.2rem;">❌</span>
+            <h4>Editing on two devices simultaneously without syncing first</h4>
+          </div>
+          <p style="font-size:0.88rem;">Always sync before you start working on a new device. If you edited the same note on two devices without syncing, DGS's three-way merge will try to reconcile them, but the result may not be what you expect.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-2">
+            <span style="font-size:1.2rem;">❌</span>
+            <h4>Plugin folder name has wrong capitalisation or extra characters</h4>
+          </div>
+          <p style="font-size:0.88rem;">The folder must be named exactly <code>direct-github-sync</code> — all lowercase, with hyphens. No spaces, no underscores, no extra letters.</p>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="flex-center gap-2 mb-2">
+            <span style="font-size:1.2rem;">❌</span>
+            <h4>Initialising the repo with a README</h4>
+          </div>
+          <p style="font-size:0.88rem;">If you created the repo with a README, it already has a commit. DGS will pull the README down on first sync. This isn't a crash — but it means you'll have a stray README in your vault. Delete it and re-sync.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <hr>
+
+    <div style="margin-top:2.5rem;text-align:center;">
+      <p class="mb-3">Still stuck? Open an issue on GitHub and describe your problem in detail.</p>
+      <a href="https://github.com/xensenx/Direct-GitHub-Sync/issues" target="_blank" class="btn btn-primary">Open an Issue on GitHub</a>
+    </div>
+
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">Direct GitHub Sync</span>
+        <span class="footer-meta">by Sen · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="quick-start.html">Quick Start</a>
+        <a href="beginners.html">Beginners</a>
+        <a href="support.html">Support</a>
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

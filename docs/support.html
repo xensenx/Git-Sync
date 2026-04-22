@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support — Direct GitHub Sync</title>
+  <meta name="description" content="Support Direct GitHub Sync — contribute, report issues, or buy Sen a coffee.">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .author-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .author-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--purple-deep), var(--purple-soft), var(--purple-deep));
+    }
+    .author-avatar {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple-mid), var(--purple-deep));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.8rem;
+      color: #fff;
+      margin-bottom: 1.25rem;
+      flex-shrink: 0;
+      box-shadow: 0 4px 20px rgba(124,91,191,0.35);
+    }
+    .contribute-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .contribute-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+    .contribute-card:hover {
+      border-color: var(--purple-border);
+      transform: translateY(-2px);
+    }
+    .contribute-card .card-icon { margin-bottom: 0.75rem; }
+    .contribute-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+    .contribute-card p { font-size: 0.85rem; color: var(--text-muted); }
+
+    .mit-block {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem 2rem;
+    }
+    .mit-block h3 { margin-bottom: 0.75rem; }
+    .mit-block p { font-size: 0.88rem; color: var(--text-secondary); max-width:none; margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    </span>
+    Direct GitHub Sync
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="quick-start.html">Quick Start</a></li>
+    <li><a href="beginners.html">Beginners</a></li>
+    <li><a href="troubleshoot.html">Troubleshoot</a></li>
+    <li class="nav-cta"><a href="support.html" class="active">Support</a></li>
+  </ul>
+  <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Hero -->
+  <div class="page-hero">
+    <div class="page-hero-bg"></div>
+    <div class="container">
+      <div class="section-label">Community & Support</div>
+      <h1>Support the Project</h1>
+      <p class="subtitle">Direct GitHub Sync is free, open source, and built by one person in their spare time. Here's how you can help.</p>
+    </div>
+  </div>
+
+  <div class="container" style="padding-bottom:5rem;max-width:900px;">
+
+    <!-- Author Note -->
+    <section style="margin-bottom:4rem;">
+      <div class="section-label">Author's Note</div>
+      <div class="author-card">
+        <div class="author-avatar">S</div>
+        <h2 style="margin-bottom:1rem;">Hey, I'm Sen.</h2>
+        <p style="max-width:60ch;margin-bottom:1.25rem;font-size:1rem;">
+          I built Direct GitHub Sync because I wanted to back up my Obsidian vault across all my devices without installing Git on my phone or paying for a sync service. I figured if I needed it, other people probably did too.
+        </p>
+        <p style="max-width:60ch;margin-bottom:1.25rem;font-size:1rem;color:var(--text-secondary);">
+          DGS has grown more than I expected, and I'm happy to keep improving it. It's free and will stay free. If it's been useful to you, the best things you can do are: star the repo, share it with other Obsidian users, report bugs, or throw a coffee my way if you're feeling generous.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a href="https://github.com/xensenx" target="_blank" class="btn btn-secondary">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+            @xensenx
+          </a>
+          <a href="https://ko-fi.com/xensenx" target="_blank" class="kofi-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 2.692.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+            </svg>
+            Support on Ko-fi
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ko-fi full section -->
+    <section style="margin-bottom:4rem;">
+      <div class="section-label">Monetary Support</div>
+      <h2 class="mb-2">Buy me a coffee ☕</h2>
+      <p class="mb-4">Ko-fi is a simple, no-pressure platform for one-time or recurring support. Every coffee means a lot and keeps this project alive.</p>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 2.5rem; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">☕</div>
+        <h3 style="margin-bottom: 0.5rem;">Direct GitHub Sync on Ko-fi</h3>
+        <p style="margin: 0 auto 1.75rem; font-size: 0.95rem; max-width: 42ch;">If DGS saved you time or stress, consider leaving a tip. No subscriptions, no commitments. Pay what you feel.</p>
+        <a href="https://ko-fi.com/xensenx" target="_blank" class="kofi-btn" style="font-size:1rem;padding:0.85rem 2rem;">
+          <svg style="width:24px;height:24px;" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 2.692.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+          </svg>
+          Support on Ko-fi
+        </a>
+      </div>
+    </section>
+
+    <!-- Contribute -->
+    <section style="margin-bottom:4rem;">
+      <div class="section-label">Open Source</div>
+      <h2 class="mb-2">Contribute</h2>
+      <p class="mb-4">DGS is open source and contributions are welcome. Here are ways to get involved:</p>
+
+      <div class="contribute-grid">
+        <div class="contribute-card">
+          <div class="card-icon">⭐</div>
+          <h3>Star the Repo</h3>
+          <p>Stars help others discover the plugin. Takes two seconds.</p>
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="btn btn-ghost btn-sm mt-2">Star on GitHub</a>
+        </div>
+        <div class="contribute-card">
+          <div class="card-icon">🐛</div>
+          <h3>Report Bugs</h3>
+          <p>Found something broken? Open a detailed issue on GitHub with steps to reproduce.</p>
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync/issues" target="_blank" class="btn btn-ghost btn-sm mt-2">Open Issue</a>
+        </div>
+        <div class="contribute-card">
+          <div class="card-icon">💡</div>
+          <h3>Feature Requests</h3>
+          <p>Have an idea? Open a discussion or issue with your suggestion. Good ideas get built.</p>
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync/issues" target="_blank" class="btn btn-ghost btn-sm mt-2">Suggest Feature</a>
+        </div>
+        <div class="contribute-card">
+          <div class="card-icon">🔧</div>
+          <h3>Submit a PR</h3>
+          <p>Code contributions welcome. Fork the repo, make your changes, and open a pull request.</p>
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync/fork" target="_blank" class="btn btn-ghost btn-sm mt-2">Fork Repo</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Links -->
+    <section style="margin-bottom:4rem;">
+      <div class="section-label">Links</div>
+      <h2 class="mb-3">Repository & Resources</h2>
+      <div class="grid-2">
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="card" style="text-decoration:none;display:block;">
+          <div class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--purple-glow)"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          </div>
+          <h3>Plugin Repository</h3>
+          <p style="font-size:0.88rem;">Source code, issues, releases, and discussions.</p>
+          <span style="font-size:0.8rem;color:var(--purple-glow);margin-top:0.75rem;display:block;">github.com/xensenx/Direct-GitHub-Sync ↗</span>
+        </a>
+        <a href="https://github.com/xensenx" target="_blank" class="card" style="text-decoration:none;display:block;">
+          <div class="card-icon">👤</div>
+          <h3>Sen's GitHub Profile</h3>
+          <p style="font-size:0.88rem;">Other projects and contributions from the author.</p>
+          <span style="font-size:0.8rem;color:var(--purple-glow);margin-top:0.75rem;display:block;">github.com/xensenx ↗</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- License & Policy -->
+    <section id="license" style="margin-bottom:2rem;">
+      <div class="section-label">Legal</div>
+      <h2 class="mb-3">License & Policy</h2>
+
+      <div class="mit-block mb-3">
+        <h3>MIT License</h3>
+        <p>Copyright © 2024 Sen (xensenx)</p>
+        <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+        <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+        <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+      </div>
+
+      <div class="card" style="padding:1.5rem;">
+        <h3 style="margin-bottom:0.75rem;">Privacy Policy</h3>
+        <p style="font-size:0.88rem;max-width:none;margin-bottom:0.75rem;">Direct GitHub Sync does not collect, store, or transmit any personal data to third-party servers. All data processed by this plugin stays between your device and GitHub's API using your own credentials.</p>
+        <p style="font-size:0.88rem;max-width:none;margin-bottom:0.75rem;"><strong>What the plugin accesses:</strong> Your vault files (to sync them), your GitHub Personal Access Token (to authenticate with GitHub's API), and plugin settings stored locally on your device.</p>
+        <p style="font-size:0.88rem;max-width:none;margin-bottom:0.75rem;"><strong>What the plugin does NOT do:</strong> It does not send data to any server other than GitHub's official API (<code>api.github.com</code>). It does not track usage, collect analytics, or phone home.</p>
+        <p style="font-size:0.88rem;max-width:none;color:var(--text-muted);">Your PAT is stored in Obsidian's local plugin data. Keep it secure — do not share your vault's <code>.obsidian/plugins/</code> folder or its settings file publicly.</p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">Direct GitHub Sync</span>
+        <span class="footer-meta">by Sen · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="quick-start.html">Quick Start</a>
+        <a href="beginners.html">Beginners</a>
+        <a href="troubleshoot.html">Troubleshoot</a>
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
+        <a href="https://ko-fi.com/xensenx" target="_blank">Ko-fi ↗</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

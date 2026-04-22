@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beginner's Guide — Direct GitHub Sync</title>
+  <meta name="description" content="Complete beginner's guide to setting up Direct GitHub Sync for Obsidian. No prior knowledge of GitHub or Git required.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    </span>
+    Direct GitHub Sync
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="quick-start.html">Quick Start</a></li>
+    <li><a href="beginners.html" class="active">Beginners</a></li>
+    <li><a href="troubleshoot.html">Troubleshoot</a></li>
+    <li class="nav-cta"><a href="support.html">Support</a></li>
+  </ul>
+  <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Hero -->
+  <div class="page-hero">
+    <div class="page-hero-bg"></div>
+    <div class="container">
+      <div class="section-label">No experience needed</div>
+      <h1>Beginner's Guide</h1>
+      <p class="subtitle">Never used GitHub? Never heard of Git? That's perfectly fine. This guide starts from absolute zero and walks you through every single step.</p>
+    </div>
+  </div>
+
+  <div class="container--narrow" style="padding-bottom:5rem;">
+
+    <div class="callout callout--tip">
+      <span class="callout-icon">🌱</span>
+      <div class="callout-body">
+        <strong>You don't need to know Git</strong>
+        <p>This plugin communicates directly with GitHub's web API. No terminal, no <code>git install</code>, no command line. If you can use Obsidian, you can use this.</p>
+      </div>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc mt-4">
+      <h4>On this page</h4>
+      <ol>
+        <li><a href="#what-is-github">What is GitHub?</a></li>
+        <li><a href="#create-account">Create a GitHub Account</a></li>
+        <li><a href="#create-repo">Create a Repository</a></li>
+        <li><a href="#create-pat">Create a Personal Access Token</a></li>
+        <li><a href="#install-plugin">Install the Plugin</a></li>
+        <li><a href="#configure">Configure the Plugin</a></li>
+        <li><a href="#first-sync">Your First Sync</a></li>
+        <li><a href="#ongoing">Ongoing Use</a></li>
+      </ol>
+    </div>
+
+    <!-- What is GitHub -->
+    <section id="what-is-github" style="margin:3rem 0;">
+      <div class="section-label">Background</div>
+      <h2 class="mb-2">What is GitHub?</h2>
+      <p class="mb-3">GitHub is a website that stores files in the cloud, with a superpower: it keeps a <strong>full history of every change</strong> you ever make. Think of it like Google Drive, but for files that track their own edit history automatically.</p>
+      <p>For us, GitHub is simply a place to store a backup of your Obsidian vault. Every time you sync, your notes are saved safely in the cloud. You can access them from any device, and if something goes wrong, you can go back to any previous version.</p>
+    </section>
+
+    <!-- Create Account -->
+    <section id="create-account" style="margin:3rem 0;">
+      <div class="section-label">Step 1</div>
+      <h2 class="mb-2">Create a GitHub Account</h2>
+      <p class="mb-3">If you already have one, skip ahead to Step 2.</p>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Go to github.com</h3>
+          <div class="step-body">Open <a href="https://github.com" target="_blank">github.com</a> in your browser and click <strong>Sign up</strong>.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Enter your details</h3>
+          <div class="step-body">Provide your email, choose a password, and pick a username. Your username will appear in your vault's sync history, so pick something you're comfortable with.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Verify your email</h3>
+          <div class="step-body">GitHub will send a verification code to your email. Enter it to confirm your account.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>You're in</h3>
+          <div class="step-body">Skip the onboarding survey if you like. You're now on your GitHub dashboard.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Create Repo -->
+    <section id="create-repo" style="margin:3rem 0;">
+      <div class="section-label">Step 2</div>
+      <h2 class="mb-2">Create a Repository</h2>
+      <p class="mb-2">A <strong>repository</strong> (or "repo") is just a folder on GitHub. You'll create one to hold your vault.</p>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>New repository</h3>
+          <div class="step-body">Click the <strong>+</strong> icon in the top-right corner of GitHub and select <strong>New repository</strong>.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Name your repo</h3>
+          <div class="step-body">Pick a name like <code>my-obsidian-vault</code> or <code>notes</code>. No spaces — use hyphens. Write this down, you'll need it later.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Set visibility</h3>
+          <div class="step-body">Choose <strong>Private</strong> if your notes are personal (recommended). Choose <strong>Public</strong> only if you want the world to see your notes.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>Create it</h3>
+          <div class="step-body">Leave all other options as-is and click <strong>Create repository</strong>. Leave the repo empty — DGS will populate it on first sync.</div>
+        </div>
+      </div>
+
+      <div class="callout callout--warning mt-4">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-body">
+          <strong>Don't add a README</strong>
+          <p>When creating the repo, don't initialise it with a README, .gitignore, or license. Keep it completely empty. DGS will handle the first commit.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Create PAT -->
+    <section id="create-pat" style="margin:3rem 0;">
+      <div class="section-label">Step 3</div>
+      <h2 class="mb-2">Create a Personal Access Token</h2>
+      <p class="mb-3">A <strong>Personal Access Token (PAT)</strong> is like a special password that lets the plugin write to your GitHub repository. It's more secure than your actual password because you can revoke it anytime.</p>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Open Token Settings</h3>
+          <div class="step-body">Click your profile picture → <strong>Settings</strong> → scroll all the way down to <strong>Developer settings</strong> → <strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong>.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Generate new token</h3>
+          <div class="step-body">Click <strong>Generate new token (classic)</strong>. GitHub may ask for your password again — this is normal.</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Fill in the details</h3>
+          <div class="step-body">
+            <strong>Note:</strong> Write something like "Obsidian DGS"<br>
+            <strong>Expiration:</strong> Choose 90 days or "No expiration" (your preference)<br>
+            <strong>Scopes:</strong> Check the <strong>repo</strong> checkbox (this gives full repo access — required for private repos)
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>Copy your token immediately</h3>
+          <div class="step-body">After clicking <strong>Generate token</strong>, you'll see a long string starting with <code>ghp_</code>. <strong>Copy it right now</strong> — GitHub will never show it again. Save it somewhere safe, like a notes app or password manager.</div>
+        </div>
+      </div>
+
+      <div class="callout callout--danger mt-4">
+        <span class="callout-icon">🔐</span>
+        <div class="callout-body">
+          <strong>Never share your PAT</strong>
+          <p>This token has write access to your repos. Don't paste it in public, don't send it to anyone, and don't commit it to a file. If it leaks, go to GitHub → Settings → Developer Settings → Tokens and delete it immediately.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Install Plugin -->
+    <section id="install-plugin" style="margin:3rem 0;">
+      <div class="section-label">Step 4</div>
+      <h2 class="mb-2">Install the Plugin</h2>
+
+      <div class="grid-2" style="margin-bottom:1.5rem;">
+        <div class="card">
+          <div class="card-icon">🖥️</div>
+          <h3>Desktop</h3>
+          <p style="font-size:0.88rem;">Navigate to your vault folder on your computer. You can find it by opening Obsidian → gear icon → Files & Links → look for "Vault folder location".</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📱</div>
+          <h3>Mobile</h3>
+          <p style="font-size:0.88rem;">On iOS use the <strong>Files</strong> app; on Android use a file manager like <strong>Solid Explorer</strong>. Your Obsidian vault is usually in the Documents or iCloud Drive folder.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Download the files</h3>
+          <div class="step-body">Go to the <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub repository</a>. Download these three files: <code>main.js</code>, <code>manifest.json</code>, <code>styles.css</code></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Create the plugin folder</h3>
+          <div class="step-body">Inside your vault folder, navigate to <code>.obsidian</code> → <code>plugins</code>. Create a new folder named exactly: <code>direct-github-sync</code></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Place the files</h3>
+          <div class="step-body">Move all three downloaded files into <code>direct-github-sync/</code></div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <h3>Enable in Obsidian</h3>
+          <div class="step-body">Open Obsidian → <strong>Settings</strong> (gear icon) → <strong>Community Plugins</strong> → if prompted, turn off Safe Mode → find <strong>Direct GitHub Sync</strong> in the list and toggle it on.</div>
+        </div>
+      </div>
+
+      <div class="callout callout--tip mt-4">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Don't see the plugin?</strong>
+          <p>Try restarting Obsidian after placing the files. If it still doesn't appear, double-check that all three files are inside a folder named exactly <code>direct-github-sync</code> (no typos, lowercase).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configure -->
+    <section id="configure" style="margin:3rem 0;">
+      <div class="section-label">Step 5</div>
+      <h2 class="mb-2">Configure the Plugin</h2>
+      <p class="mb-3">Go to <strong>Settings → Direct GitHub Sync</strong>. You'll see several input fields. Fill them in:</p>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="card" style="padding:1.25rem;">
+          <h4 class="mb-1">GitHub PAT</h4>
+          <p style="font-size:0.88rem;">Paste the long token you copied in Step 3. It starts with <code>ghp_</code>.</p>
+        </div>
+        <div class="card" style="padding:1.25rem;">
+          <h4 class="mb-1">GitHub Username</h4>
+          <p style="font-size:0.88rem;">Your GitHub username exactly as it appears on your profile. It's in the top-right of GitHub after you log in.</p>
+        </div>
+        <div class="card" style="padding:1.25rem;">
+          <h4 class="mb-1">Repository Name</h4>
+          <p style="font-size:0.88rem;">The name of the repo you created in Step 2. Just the name — not the full URL. E.g. <code>my-obsidian-vault</code></p>
+        </div>
+        <div class="card" style="padding:1.25rem;">
+          <h4 class="mb-1">Branch</h4>
+          <p style="font-size:0.88rem;">Leave this as <code>main</code> unless you specifically changed it when creating the repo.</p>
+        </div>
+        <div class="card" style="padding:1.25rem;">
+          <h4 class="mb-1">Device Name <span style="font-weight:400;color:var(--text-muted)">(optional)</span></h4>
+          <p style="font-size:0.88rem;">Something like <code>MacBook</code> or <code>iPhone</code>. This shows up in your sync history so you know which device made each change.</p>
+        </div>
+      </div>
+
+      <div class="callout callout--tip mt-4">
+        <span class="callout-icon">✅</span>
+        <div class="callout-body">
+          <strong>Recommended settings for beginners</strong>
+          <p>Turn on <strong>Sync on Startup</strong> and <strong>Auto Sync</strong> with a 5-minute idle interval. This means your notes sync automatically — you never have to think about it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- First Sync -->
+    <section id="first-sync" style="margin:3rem 0;">
+      <div class="section-label">Step 6</div>
+      <h2 class="mb-2">Your First Sync</h2>
+      <p class="mb-3">Close the Settings panel. You should see a small sync icon (two circular arrows) in the left sidebar of Obsidian. Click it.</p>
+
+      <p class="mb-3">You'll see a status message at the top of the screen. On first sync it might take a minute if you have many notes. After that, only changed files are synced so it's very fast.</p>
+
+      <div class="callout callout--info">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <strong>What just happened?</strong>
+          <p>DGS compared your local vault with the (empty) GitHub repo and uploaded all your files. If you now go to your GitHub repository page, you'll see all your notes there as files. You can even read them on the GitHub website!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ongoing -->
+    <section id="ongoing" style="margin:3rem 0;">
+      <div class="section-label">Day-to-day</div>
+      <h2 class="mb-2">Ongoing Use</h2>
+      <p class="mb-3">After initial setup, using DGS is completely invisible if you enabled Auto Sync. Your notes back up automatically.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-icon">🔄</div>
+          <h3>Manual Sync</h3>
+          <p style="font-size:0.88rem;">Click the sync ribbon icon, or use the Command Palette (<kbd>Ctrl/Cmd + P</kbd>) → search "sync".</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📲</div>
+          <h3>Sync Across Devices</h3>
+          <p style="font-size:0.88rem;">Install the plugin on your phone or another computer, configure it with the same settings, and your vault will stay in sync automatically.</p>
+        </div>
+      </div>
+
+      <div class="callout callout--warning mt-4">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-body">
+          <strong>When using multiple devices</strong>
+          <p>Always sync before you start editing on a new device. This pulls the latest changes from GitHub so you're working with the most current version of your notes.</p>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <div style="margin-top:2rem;text-align:center;">
+      <p class="mb-3">Something not working?</p>
+      <a href="troubleshoot.html" class="btn btn-primary">Visit Troubleshoot →</a>
+    </div>
+
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">Direct GitHub Sync</span>
+        <span class="footer-meta">by Sen · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="quick-start.html">Quick Start</a>
+        <a href="troubleshoot.html">Troubleshoot</a>
+        <a href="support.html">Support</a>
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

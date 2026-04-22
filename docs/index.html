@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Direct GitHub Sync — Obsidian Plugin</title>
+  <meta name="description" content="Push and pull your entire Obsidian vault to/from GitHub without Git or Node.js. Works on desktop and mobile.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────── -->
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <span class="nav-logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    </span>
+    Direct GitHub Sync
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="quick-start.html">Quick Start</a></li>
+    <li><a href="beginners.html">Beginners</a></li>
+    <li><a href="troubleshoot.html">Troubleshoot</a></li>
+    <li class="nav-cta"><a href="support.html">Support</a></li>
+  </ul>
+  <button class="nav-hamburger" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- ── Page ───────────────────────────────────────── -->
+<div class="page-wrapper">
+
+  <!-- Hero -->
+  <section style="position:relative; overflow:hidden; padding: 7rem 0 5rem;">
+    <div class="ambient-bg ambient-1"></div>
+    <div class="ambient-bg ambient-2"></div>
+    <!-- grid lines -->
+    <div style="position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px, transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black,transparent);pointer-events:none;opacity:0.4;"></div>
+
+    <div class="container" style="position:relative;z-index:1;">
+      <div style="max-width:700px;">
+        <div class="flex flex-wrap gap-2 mb-3 animate-up">
+          <span class="badge badge--purple">✦ Obsidian Plugin</span>
+          <span class="badge badge--green">v2.0.0</span>
+          <span class="badge badge--amber">No Git Required</span>
+        </div>
+
+        <h1 class="animate-up" style="animation-delay:0.08s;">
+          Sync your vault.<br>
+          <span class="text-purple">No setup headaches.</span>
+        </h1>
+
+        <p class="animate-up" style="font-size:1.15rem;margin-top:1.25rem;margin-bottom:2rem;max-width:56ch;animation-delay:0.16s;">
+          Direct GitHub Sync pushes and pulls your entire Obsidian vault to a GitHub repository — no Git installation, no Node.js, no terminal. Works seamlessly on both desktop and mobile.
+        </p>
+
+        <div class="flex flex-wrap gap-3 animate-up" style="animation-delay:0.24s;">
+          <a href="beginners.html" class="btn btn-primary btn-lg">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Get Started
+          </a>
+          <a href="quick-start.html" class="btn btn-secondary btn-lg">Quick Start</a>
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="btn btn-ghost btn-lg">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">What it does</div>
+      <h2 class="mb-4">Everything you need, nothing you don't.</h2>
+
+      <div class="grid-3">
+        <div class="card animate-up">
+          <div class="card-icon">🔄</div>
+          <h3>Smart Sync</h3>
+          <p>Three-way diff engine compares local, base, and remote states. Only changed files are touched — fast and bandwidth-friendly.</p>
+        </div>
+        <div class="card animate-up">
+          <div class="card-icon">📱</div>
+          <h3>Mobile-First</h3>
+          <p>Works identically on iOS and Android Obsidian. No workarounds, no companion apps. Pure API calls.</p>
+        </div>
+        <div class="card animate-up">
+          <div class="card-icon">⚡</div>
+          <h3>Auto Sync</h3>
+          <p>Set a quiet idle timer and DGS syncs automatically in the background. Zero manual effort after setup.</p>
+        </div>
+        <div class="card animate-up">
+          <div class="card-icon">🔒</div>
+          <h3>Private Repos</h3>
+          <p>Full support for private repositories via Personal Access Tokens. Your notes stay yours.</p>
+        </div>
+        <div class="card animate-up">
+          <div class="card-icon">🚫</div>
+          <h3>Path Ignoring</h3>
+          <p>Exclude files or folders with simple glob patterns. <code>.obsidian/</code> is excluded by default.</p>
+        </div>
+        <div class="card animate-up">
+          <div class="card-icon">🏷️</div>
+          <h3>Device Labels</h3>
+          <p>Tag each commit with a device name. Know exactly which machine or phone made a change.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" style="background: var(--bg-surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+    <div class="container">
+      <div class="section-label">The process</div>
+      <h2 class="mb-4">How it works</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;">
+        <div class="step-card animate-up">
+          <div class="step-num">1</div>
+          <h3>Connect</h3>
+          <div class="step-body">Enter your GitHub PAT, username, and repo name in the plugin settings. One-time setup.</div>
+        </div>
+        <div class="step-card animate-up">
+          <div class="step-num">2</div>
+          <h3>Pull</h3>
+          <div class="step-body">DGS fetches the remote repo tree and downloads only what's changed since your last sync.</div>
+        </div>
+        <div class="step-card animate-up">
+          <div class="step-num">3</div>
+          <h3>Write</h3>
+          <div class="step-body">Take notes in Obsidian as normal. DGS watches for changes in the background.</div>
+        </div>
+        <div class="step-card animate-up">
+          <div class="step-num">4</div>
+          <h3>Push</h3>
+          <div class="step-body">Tap sync or let auto-sync fire. Changed files are committed and pushed to GitHub instantly.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pick your path -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">Docs</div>
+      <h2 class="mb-2">Pick your path</h2>
+      <p class="mb-6">Choose the guide that matches your experience level.</p>
+      <div class="grid-2">
+        <a href="beginners.html" class="card" style="text-decoration:none;display:block;">
+          <div class="card-icon">🌱</div>
+          <h3>Complete Beginner</h3>
+          <p>Never used GitHub? That's totally fine. This guide walks you from zero — creating a GitHub account, generating a token, and getting your first sync working.</p>
+          <div style="margin-top:1rem;" class="badge badge--green">Start here</div>
+        </a>
+        <a href="quick-start.html" class="card" style="text-decoration:none;display:block;">
+          <div class="card-icon">⚡</div>
+          <h3>Experienced User</h3>
+          <p>Already have a GitHub account and PAT? Jump straight to the settings reference and get syncing in under two minutes.</p>
+          <div style="margin-top:1rem;" class="badge badge--purple">Quick Setup</div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- MIT / author -->
+  <section class="section--sm">
+    <div class="container">
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;">
+        <div>
+          <div class="section-label" style="margin-bottom:0.5rem;">Open Source</div>
+          <h3 style="margin-bottom:0.35rem;">MIT Licensed — free forever</h3>
+          <p style="font-size:0.9rem;max-width:50ch;">Built by <a href="https://github.com/xensenx" target="_blank" style="color:var(--purple-glow);">Sen</a>. Contributions, issues, and ideas are always welcome on GitHub.</p>
+        </div>
+        <div class="flex gap-3 flex-wrap">
+          <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="btn btn-secondary">View on GitHub</a>
+          <a href="support.html" class="btn btn-ghost">Support the project</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ── Footer ─────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">Direct GitHub Sync</span>
+        <span class="footer-meta">by Sen · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="quick-start.html">Quick Start</a>
+        <a href="beginners.html">Beginners</a>
+        <a href="troubleshoot.html">Troubleshoot</a>
+        <a href="support.html">Support</a>
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

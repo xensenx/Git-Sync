@@ -673,4 +673,127 @@
     align-items: flex-start;
     gap: 4px;
   }
+
+  .dgs-about-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dgs-about-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   About Section
+   ══════════════════════════════════════════════ */
+
+.dgs-about-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  padding: 4px 0;
+  margin: 8px 0 16px;
+  overflow: hidden;
+}
+
+.dgs-about-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  transition: background 0.15s ease;
+}
+
+.dgs-about-row:not(:last-child) {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dgs-about-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dgs-about-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.dgs-about-icon svg {
+  display: block;
+}
+
+.dgs-about-icon--kofi {
+  color: #ff5e5b;
+  border-color: rgba(255, 94, 91, 0.25);
+  background: rgba(255, 94, 91, 0.08);
+}
+
+.dgs-about-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+
+.dgs-about-label {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-normal);
+}
+
+.dgs-about-value {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dgs-about-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 0.82em;
+  font-weight: 500;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dgs-about-btn:hover {
+  background: var(--interactive-hover);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.dgs-about-btn--kofi {
+  background: #ff5e5b;
+  color: #fff;
+  border-color: #ff5e5b;
+  font-weight: 600;
+}
+
+.dgs-about-btn--kofi:hover {
+  background: #e54542;
+  border-color: #e54542;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 94, 91, 0.35);
+}
+
+.dgs-about-row--kofi {
+  background: rgba(255, 94, 91, 0.03);
 }

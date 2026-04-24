@@ -3,6 +3,17 @@
 const { PluginSettingTab, Setting, Notice, setIcon } = require("obsidian");
 
 // ─────────────────────────────────────────────
+//  Inline SVG icons for the About section
+//  (avoids dependency on Obsidian icon registry)
+// ─────────────────────────────────────────────
+const ICONS = {
+  github: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>`,
+  code: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+  book: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`,
+  kofi: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>`,
+};
+
+// ─────────────────────────────────────────────
 //  Settings Tab
 // ─────────────────────────────────────────────
 
@@ -10,12 +21,12 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
-    this._draft = {};
-    this._validationEl = null;
-    this._saveBtn = null;
-    this._configureBtn = null;
-    this._connectionPanelEl = null;
-    this._connectionOpen = false;
+    this._draft          = {};
+    this._validationEl   = null;
+    this._saveBtn        = null;
+    this._configureBtn   = null;
+    this._connectionPanel = null;
+    this._connectionOpen  = false;
   }
 
   _initDraft() {
@@ -26,10 +37,10 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   _isDirty() {
     const s = this.plugin.settings;
     return (
-      this._draft.pat !== s.pat ||
+      this._draft.pat      !== s.pat      ||
       this._draft.username !== s.username ||
-      this._draft.repo !== s.repo ||
-      this._draft.branch !== s.branch
+      this._draft.repo     !== s.repo     ||
+      this._draft.branch   !== s.branch
     );
   }
 
@@ -39,26 +50,23 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     containerEl.addClass("dgs-settings");
     this._initDraft();
 
-    // ── Plugin Header ──────────────────────────────────────────────────
-    const headerEl = containerEl.createDiv({ cls: "dgs-settings-header" });
+    // ── Header ────────────────────────────────────────────────────────
+    const headerEl   = containerEl.createDiv({ cls: "dgs-settings-header" });
     const headerIcon = headerEl.createSpan({ cls: "dgs-settings-header-icon" });
     try { setIcon(headerIcon, "git-branch"); } catch { headerIcon.setText("G"); }
     const headerText = headerEl.createDiv();
     headerText.createEl("h2", { text: "Direct GitHub Sync" });
     headerText.createEl("p", {
       text: "Sync your vault with GitHub — no Git CLI, no Node.js, works on mobile.",
-      cls: "dgs-settings-subtitle",
+      cls:  "dgs-settings-subtitle",
     });
 
     // ══════════════════════════════════════════════════════════════════
-    //  Section 1 — Connection  (collapsed behind a Configure button)
+    //  Section 1 — Connection
     // ══════════════════════════════════════════════════════════════════
     this._createSectionHeader(containerEl, "lock", "Connection");
-
-    // Status summary — always visible
     this._renderConnectionStatus(containerEl);
 
-    // "Configure Connection" button — toggles fields
     new Setting(containerEl).addButton((btn) => {
       this._configureBtn = btn;
       btn
@@ -66,10 +74,9 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
         .onClick(() => this._toggleConnectionPanel());
     });
 
-    // Collapsible panel
-    this._connectionPanelEl = containerEl.createDiv({ cls: "dgs-connection-panel" });
-    if (!this._connectionOpen) this._connectionPanelEl.addClass("dgs-hidden");
-    this._renderConnectionFields(this._connectionPanelEl);
+    this._connectionPanel = containerEl.createDiv({ cls: "dgs-connection-panel" });
+    if (!this._connectionOpen) this._connectionPanel.addClass("dgs-hidden");
+    this._renderConnectionFields(this._connectionPanel);
 
     // ══════════════════════════════════════════════════════════════════
     //  Section 2 — Sync Behaviour
@@ -78,19 +85,32 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Ignore .obsidian directory")
-      .setDesc("Prevents plugin configs and workspace state from syncing.")
+      .setDesc(
+        "Prevents plugin configs and workspace state from syncing. " +
+        "Disabling this will sync workspace.json, which changes on every app launch and " +
+        "will generate conflicts on nearly every sync when using multiple devices."
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.ignoreObsidianDir).onChange(async (v) => {
           this.plugin.settings.ignoreObsidianDir = v;
           await this.plugin.saveSettings();
+          if (!v) {
+            new Notice(
+              "⚠️ Warning: Syncing .obsidian/ will include workspace.json, " +
+              "which changes on every app launch. This will cause frequent " +
+              "conflicts when syncing across multiple devices. Consider adding " +
+              "'.obsidian/workspace.json' to your ignored paths instead.",
+              15000
+            );
+          }
         })
       );
 
     new Setting(containerEl)
       .setName("Ignored paths")
       .setDesc(
-        "One path per line. Supports wildcards (*). Lines starting with # are comments. " +
-          "Paths ending with / match directories."
+        "One path per line. Supports wildcards (*). " +
+        "Lines starting with # are comments. Paths ending with / match directories."
       )
       .addTextArea((text) => {
         text
@@ -106,7 +126,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Device name (optional)")
-      .setDesc('Shown in commit messages, e.g. "Vault sync from PC: 20 Apr 2026 at 14:03".')
+      .setDesc('Appears in commit messages, e.g. "Vault sync from Phone: 20 Apr 2026 at 14:03".')
       .addText((text) =>
         text
           .setPlaceholder("e.g. PC, Phone, Laptop")
@@ -119,7 +139,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Concurrent requests")
-      .setDesc("Number of parallel API calls. Higher is faster but risks rate limits. Default: 5.")
+      .setDesc("Number of parallel API calls. Higher = faster but risks rate limits. Default: 5.")
       .addSlider((slider) =>
         slider
           .setLimits(1, 10, 1)
@@ -132,116 +152,109 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
       );
 
     // ══════════════════════════════════════════════════════════════════
-    //  Section 3 — Smart Sync
-    // ══════════════════════════════════════════════════════════════════
-    this._createSectionHeader(containerEl, "refresh-cw", "Smart Sync");
-
-    containerEl.createEl("p", {
-      text: "When enabled, changes are automatically synced after a period of inactivity. Before running, it checks whether remote has actually changed to avoid unnecessary API traffic. Conflicts are surfaced in the status bar rather than interrupting your work.",
-      cls: "setting-item-description dgs-section-note",
-    });
-
-    new Setting(containerEl)
-      .setName("Enable smart sync")
-      .setDesc("Sync automatically after the idle period. Conflicts appear in the status bar.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoSyncEnabled).onChange(async (v) => {
-          this.plugin.settings.autoSyncEnabled = v;
-          await this.plugin.saveSettings();
-          new Notice(
-            v ? "Smart sync enabled. Restart Obsidian to activate." : "Smart sync disabled.",
-            4000
-          );
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Idle interval (minutes)")
-      .setDesc("Minutes of inactivity before smart sync triggers. Range: 1–30.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(1, 30, 1)
-          .setValue(this.plugin.settings.autoSyncInterval ?? 5)
-          .setDynamicTooltip()
-          .onChange(async (v) => {
-            this.plugin.settings.autoSyncInterval = v;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Sync on startup")
-      .setDesc("Run a sync when Obsidian starts (only if smart sync is enabled).")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (v) => {
-          this.plugin.settings.syncOnStartup = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    // ══════════════════════════════════════════════════════════════════
-    //  Section 4 — Quick Actions
+    //  Section 3 — Quick Actions
     // ══════════════════════════════════════════════════════════════════
     this._createSectionHeader(containerEl, "zap", "Quick Actions");
 
     new Setting(containerEl)
-      .setName("Sync with GitHub")
-      .setDesc("Full bidirectional sync — downloads remote changes, uploads local changes, detects conflicts.")
-      .addButton((btn) =>
-        btn.setButtonText("Sync Now").setCta().onClick(() => this.plugin.sync())
-      );
-
-    new Setting(containerEl)
       .setName("Push to GitHub")
-      .setDesc("Upload local changes only. Warns if remote has newer commits.")
-      .addButton((btn) => btn.setButtonText("Push Now").onClick(() => this.plugin.push()));
+      .setDesc(
+        "Upload local changes. Detects conflicts with remote changes and asks how to resolve them. " +
+        "Warns if remote has commits newer than your last sync."
+      )
+      .addButton((btn) => btn.setButtonText("Push Now").setCta().onClick(() => this.plugin.push()));
 
     new Setting(containerEl)
       .setName("Pull from GitHub")
-      .setDesc("Download remote changes only. Protects files with un-pushed local edits.")
+      .setDesc(
+        "Download remote changes. Detects conflicts with local edits and asks how to resolve them."
+      )
       .addButton((btn) => btn.setButtonText("Pull Now").onClick(() => this.plugin.pull()));
 
     // ══════════════════════════════════════════════════════════════════
-    //  Section 5 — Danger Zone
+    //  Section 4 — Maintenance
     // ══════════════════════════════════════════════════════════════════
-    this._createSectionHeader(containerEl, "alert-triangle", "Danger Zone");
+    this._createSectionHeader(containerEl, "wrench", "Maintenance");
 
     new Setting(containerEl)
       .setName("Reset sync cache")
       .setDesc(
-        "Clears the SHA cache and commit cursor. The next sync will be a full comparison. " +
-          "Use after a manual repository reset."
+        "Clears the local record of what was last synced. " +
+        "The next push or pull will do a full comparison against the remote. " +
+        "Use this if the status bar seems wrong or after manually editing files in the repo."
       )
       .addButton((btn) =>
         btn
           .setButtonText("Reset Cache")
           .setWarning()
           .onClick(async () => {
-            this.plugin.settings.syncCache = {};
-            this.plugin.settings.lastPulledShas = {};
+            this.plugin.settings.syncCache             = {};
             this.plugin.settings.lastKnownRemoteCommit = "";
-            this.plugin.settings.lastSyncTime = 0;
+            this.plugin.settings.lastSyncTime          = 0;
             await this.plugin.saveSettings();
-            new Notice("Sync cache cleared. Next sync will be a full comparison.", 5000);
+            new Notice("Sync cache cleared. Next push/pull will do a full comparison.", 5000);
           })
       );
 
-    // ── Footer ──
+    // ══════════════════════════════════════════════════════════════════
+    //  Section 5 — About
+    // ══════════════════════════════════════════════════════════════════
+    this._createSectionHeader(containerEl, "info", "About");
+
+    const aboutCard = containerEl.createDiv({ cls: "dgs-about-card" });
+
+    // --- Author ---
+    const authorRow = aboutCard.createDiv({ cls: "dgs-about-row" });
+    authorRow.innerHTML = `<span class="dgs-about-icon">${ICONS.github}</span>`;
+    const authorText = authorRow.createDiv({ cls: "dgs-about-text" });
+    authorText.createEl("span", { text: "Author", cls: "dgs-about-label" });
+    authorText.createEl("span", { text: "Sen (@xensenx)", cls: "dgs-about-value" });
+    const authorBtn = authorRow.createEl("button", { text: "GitHub Profile", cls: "dgs-about-btn" });
+    authorBtn.onclick = () => window.open("https://github.com/xensenx", "_blank");
+
+    // --- Source Code ---
+    const repoRow = aboutCard.createDiv({ cls: "dgs-about-row" });
+    repoRow.innerHTML = `<span class="dgs-about-icon">${ICONS.code}</span>`;
+    const repoText = repoRow.createDiv({ cls: "dgs-about-text" });
+    repoText.createEl("span", { text: "Source Code", cls: "dgs-about-label" });
+    repoText.createEl("span", { text: "Open-source on GitHub", cls: "dgs-about-value" });
+    const repoBtn = repoRow.createEl("button", { text: "View Repository", cls: "dgs-about-btn" });
+    repoBtn.onclick = () => window.open("https://github.com/xensenx/Direct-GitHub-Sync", "_blank");
+
+    // --- Documentation ---
+    const docsRow = aboutCard.createDiv({ cls: "dgs-about-row" });
+    docsRow.innerHTML = `<span class="dgs-about-icon">${ICONS.book}</span>`;
+    const docsText = docsRow.createDiv({ cls: "dgs-about-text" });
+    docsText.createEl("span", { text: "Documentation", cls: "dgs-about-label" });
+    docsText.createEl("span", { text: "Setup guides, FAQ & troubleshooting", cls: "dgs-about-value" });
+    const docsBtn = docsRow.createEl("button", { text: "Open Docs", cls: "dgs-about-btn" });
+    docsBtn.onclick = () => window.open("https://xensenx.github.io/Direct-GitHub-Sync/", "_blank");
+
+    // --- Ko-fi Support ---
+    const kofiRow = aboutCard.createDiv({ cls: "dgs-about-row dgs-about-row--kofi" });
+    kofiRow.innerHTML = `<span class="dgs-about-icon dgs-about-icon--kofi">${ICONS.kofi}</span>`;
+    const kofiText = kofiRow.createDiv({ cls: "dgs-about-text" });
+    kofiText.createEl("span", { text: "Support Development", cls: "dgs-about-label" });
+    kofiText.createEl("span", { text: "Buy the developer a coffee ☕", cls: "dgs-about-value" });
+    const kofiBtn = kofiRow.createEl("button", { text: "Support on Ko-fi", cls: "dgs-about-btn dgs-about-btn--kofi" });
+    kofiBtn.onclick = () => window.open("https://ko-fi.com/xensenx", "_blank");
+
+    // ── Footer ────────────────────────────────────────────────────────
     containerEl.createEl("hr", { cls: "dgs-settings-divider" });
     containerEl.createEl("p", {
-      text: "Tip: Assign hotkeys to Push, Pull, and Sync via Settings → Hotkeys.",
-      cls: "setting-item-description",
+      text: "Tip: Assign hotkeys to Push and Pull via Settings → Hotkeys.",
+      cls:  "setting-item-description",
     });
   }
 
-  /** Always-visible connection status line */
-  _renderConnectionStatus(container) {
-    const s = this.plugin.settings;
-    const isConfigured = !!(s.pat && s.username && s.repo && s.branch);
+  // ── Connection helpers ────────────────────────────────────────────
 
-    const statusEl = container.createDiv({ cls: "dgs-connection-status" });
-    const iconEl = statusEl.createSpan({ cls: "dgs-connection-status-icon" });
-    const textEl = statusEl.createSpan({ cls: "dgs-connection-status-text" });
+  _renderConnectionStatus(container) {
+    const s            = this.plugin.settings;
+    const isConfigured = !!(s.pat && s.username && s.repo && s.branch);
+    const statusEl     = container.createDiv({ cls: "dgs-connection-status" });
+    const iconEl       = statusEl.createSpan({ cls: "dgs-connection-status-icon" });
+    const textEl       = statusEl.createSpan({ cls: "dgs-connection-status-text" });
 
     if (isConfigured) {
       statusEl.addClass("dgs-connection-status--ok");
@@ -256,9 +269,8 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
   _toggleConnectionPanel() {
     this._connectionOpen = !this._connectionOpen;
-    if (this._connectionPanelEl) {
-      if (this._connectionOpen) this._connectionPanelEl.removeClass("dgs-hidden");
-      else this._connectionPanelEl.addClass("dgs-hidden");
+    if (this._connectionPanel) {
+      this._connectionPanel.toggleClass("dgs-hidden", !this._connectionOpen);
     }
     if (this._configureBtn) {
       this._configureBtn.setButtonText(
@@ -268,17 +280,18 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   }
 
   _renderConnectionFields(panel) {
-    const authNote = panel.createEl("p", { cls: "setting-item-description dgs-section-note" });
-    authNote.innerHTML =
-      "Changes are applied when you click <strong>Save Connection Settings</strong>.";
+    panel.createEl("p", {
+      cls:  "setting-item-description dgs-section-note",
+      text: "Changes are applied when you click Save Connection Settings.",
+    });
 
     new Setting(panel)
       .setName("Personal Access Token (PAT)")
       .setDesc("GitHub → Settings → Developer settings → Personal access tokens. Needs 'repo' scope.")
       .addText((text) => {
-        text.inputEl.type = "password";
+        text.inputEl.type         = "password";
         text.inputEl.autocomplete = "off";
-        text.inputEl.spellcheck = false;
+        text.inputEl.spellcheck   = false;
         text
           .setPlaceholder("ghp_xxxxxxxxxxxxxxxxxxxx")
           .setValue(this._draft.pat)
@@ -317,8 +330,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
 
     this._validationEl = panel.createDiv({ cls: "dgs-validation-result dgs-hidden" });
 
-    const actionSetting = new Setting(panel);
-    actionSetting
+    new Setting(panel)
       .addButton((btn) => {
         this._saveBtn = btn;
         btn
@@ -332,8 +344,8 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   }
 
   _createSectionHeader(container, icon, title) {
-    const header = container.createDiv({ cls: "dgs-section-header" });
-    const iconEl = header.createSpan({ cls: "dgs-section-icon" });
+    const header  = container.createDiv({ cls: "dgs-section-header" });
+    const iconEl  = header.createSpan({ cls: "dgs-section-icon" });
     try { setIcon(iconEl, icon); } catch { iconEl.setText("•"); }
     header.createEl("h3", { text: title });
   }
@@ -341,29 +353,30 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
   _updateSaveBtnState() {
     if (!this._saveBtn) return;
     this._saveBtn.setButtonText(
-      this._isDirty() ? "Save Connection Settings (unsaved)" : "Save Connection Settings"
+      this._isDirty() ? "Save Connection Settings (unsaved changes)" : "Save Connection Settings"
     );
   }
 
   async _saveCredentials() {
-    const d = this._draft;
+    const d      = this._draft;
     const issues = [];
-    if (!d.pat) issues.push("Personal Access Token is required.");
+    if (!d.pat)      issues.push("Personal Access Token is required.");
     if (!d.username) issues.push("GitHub username is required.");
-    if (!d.repo) issues.push("Repository name is required.");
-    if (!d.branch) issues.push("Branch is required.");
+    if (!d.repo)     issues.push("Repository name is required.");
+    if (!d.branch)   issues.push("Branch is required.");
     if (d.pat && !/^(ghp_|github_pat_|gho_|ghs_|ghr_)/.test(d.pat))
       issues.push("PAT format looks incorrect — it should start with 'ghp_' or 'github_pat_'.");
+
     if (issues.length > 0) {
-      this._showValidation("error", "Cannot save:\n• " + issues.join("\n• "));
+      this._showValidation("error", issues.join(" "));
       return;
     }
 
-    this.plugin.settings.pat = d.pat;
+    this.plugin.settings.pat      = d.pat;
     this.plugin.settings.username = d.username;
-    this.plugin.settings.repo = d.repo;
-    this.plugin.settings.branch = d.branch;
-    // Reset commit cursor so next sync does a clean comparison against the new repo
+    this.plugin.settings.repo     = d.repo;
+    this.plugin.settings.branch   = d.branch;
+    // Reset commit cursor so next op does a clean comparison
     this.plugin.settings.lastKnownRemoteCommit = "";
     await this.plugin.saveSettings();
 
@@ -378,20 +391,18 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
       return;
     }
     if (!this.plugin._isConfigured()) {
-      this._showValidation("error", "Connection is not configured. Fill in all fields and save first.");
+      this._showValidation("error", "Fill in all fields and save before testing.");
       return;
     }
     this._showValidation("info", "Testing connection…");
     try {
-      const client = this.plugin._client();
-      const result = await client.validateSettings();
+      const result = await this.plugin._client().validateSettings();
       this._showValidation(result.ok ? "ok" : "error", result.message);
     } catch (e) {
       this._showValidation("error", `Unexpected error: ${e.message}`);
     }
   }
 
-  /** Show a validation result using SVG icons (no emojis). */
   _showValidation(type, message) {
     const el = this._validationEl;
     if (!el) return;
@@ -406,9 +417,7 @@ class DirectGitHubSyncSettingTab extends PluginSettingTab {
     const cls = { ok: "dgs-ok", error: "dgs-err", info: "dgs-info" };
     el.addClass(cls[type] || "dgs-info");
     el.empty();
-
-    const iconWrap = el.createSpan({ cls: "dgs-validation-icon" });
-    iconWrap.innerHTML = svgIcons[type] || svgIcons.info;
+    el.createSpan({ cls: "dgs-validation-icon" }).innerHTML = svgIcons[type] || svgIcons.info;
     el.createSpan({ text: "\u00a0" + message, cls: "dgs-validation-text" });
   }
 }

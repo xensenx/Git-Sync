@@ -116,11 +116,11 @@ You can trigger actions by setting custom hotkeys in obsidian,
 we recommend:
 
 
-- `ctrl + Arrow up` or `ctrl + page up` for push
+- `ctrl + Arrow up` or `ctrl + Page up` for push
 
 And 
 
-- `ctrl + arrow down` or `ctrl + page down` for pull
+- `ctrl + Arrow down` or `ctrl + Page down` for pull
 
 
 (This ensures no hotkey conflicts occurs with other shortcuts)

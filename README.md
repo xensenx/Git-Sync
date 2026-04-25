@@ -115,9 +115,13 @@ Save settings and test the connection.
 You can trigger actions by setting custom hotkeys in obsidian,
 we recommend:
 
+
 -`ctrl + Arrow up` or `ctrl + page up` for push
+
 And 
+
 -`ctrl + arrow down` or `ctrl + page down` for pull
+
 
 (This ensures no hotkey conflicts with other shortcuts)
 

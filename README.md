@@ -189,11 +189,10 @@ These will be built on top of the current manual system once it is fully stabili
 If this project is useful to you, you can support development:
 
 <div align="left">
-  <a href="https://ko-fi.com/xensenx" target="_blank">
-    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="50" />
+  <a href="https://ko-fi.com/xensenx">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" width="250" />
   </a>
 </div>
-
 ---
 
 ## Final Note

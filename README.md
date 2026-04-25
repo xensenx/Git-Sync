@@ -1,78 +1,179 @@
 # Direct GitHub Sync for Obsidian
 
-Direct GitHub Sync is a zero-dependency Obsidian plugin that allows you to push, pull, and sync your entire vault with a GitHub repository. It operates entirely over the GitHub REST API, meaning it requires no local Git installation, no Node.js environment, and works flawlessly natively on both desktop and Obsidian Mobile (Android/iOS).
+Direct GitHub Sync is an Obsidian plugin that allows you to push and pull your entire vault to and from a GitHub repository.
+
+It operates entirely over the GitHub REST API, meaning it does not require a local Git installation or a Node.js environment. The plugin works natively on both desktop and Obsidian Mobile.
+
+The current version focuses on a simple goal:  
+**reliable, manual synchronization with clear behavior and explicit control.**
+
+---
+
+## Overview
+
+This plugin provides a manual alternative to Obsidian Sync using GitHub as the storage and transport layer.
+
+Instead of background automation, it gives you:
+
+- explicit push and pull actions  
+- clear conflict handling  
+- predictable behavior across devices  
+
+This makes it suitable both as a backup system and as a controlled multi-device workflow.
+
+---
 
 ## Features
 
-* **Cross-Platform Compatibility:** Works natively on Windows, macOS, Linux, Android, and iOS.
-* **True Three-Way Sync:** Compares local file states, remote repository states, and a local cache to perform accurate bidirectional synchronization.
-* **Conflict Resolution:** Built-in UI to handle merge conflicts. When a file is modified on both devices, a modal allows you to "Keep Local", "Keep Remote", or "Keep Both".
-* **Smart Auto-Sync:** Automatically tracks vault activity and triggers a sync only after a configurable period of inactivity, saving battery and API calls.
-* **Ignore Rules:** Supports wildcards and directory exclusions to prevent specific files (or the `.obsidian` configuration folder) from being uploaded to GitHub.
-* **Status Indicators:** A comprehensive status bar element provides real-time feedback on sync state (e.g., local ahead, remote ahead, diverged, offline, syncing).
-* **High Performance:** Utilizes the native WebCrypto API for fast, non-blocking local file hashing (SHA-1) to quickly determine file modifications.
+- **Manual Push & Pull**  
+  Upload local changes or download remote changes explicitly. No automatic background sync.
+
+- **Conflict Detection & Resolution**  
+  When the same file is modified in multiple places, the plugin detects it and prompts you to:
+  - Keep Local  
+  - Keep Remote  
+  - Keep Both (when possible)
+
+- **Cross-Platform Support**  
+  Works on desktop (Windows, macOS, Linux) and mobile (Android, iOS).
+
+- **No Git or Node.js Required**  
+  All operations are performed through the GitHub API.
+
+- **Status Visibility**  
+  The status bar reflects current state (synced, ahead, behind, diverged, syncing, etc.).
+
+- **Ignore Rules**  
+  Exclude files or folders from syncing using patterns.
+
+---
+
+## Important Note
+
+This plugin has been tested across multiple devices and typical workflows.  
+As with any sync system, edge cases may occur in more complex scenarios.
+
+It is recommended to keep backups of your vault.
+
+If you encounter any issues, please open a GitHub issue with as much detail as possible.
+
+---
 
 ## Installation
 
-As this plugin is currently in development, it must be installed manually.
+This plugin is currently installed manually.
 
-1.  Download the latest production build files: `main.js`, `manifest.json`, and `styles.css`.
-2.  Navigate to your Obsidian vault directory.
-3.  Open the hidden `.obsidian/plugins/` folder.
-4.  Create a new folder named `direct-github-sync`.
-5.  Place the three downloaded files into this new folder.
-6.  Restart Obsidian, open **Settings > Community Plugins**, and enable "Direct GitHub Sync".
+1. Download the latest build files:
+   - `main.js`
+   - `manifest.json`
+   - `styles.css`
+
+2. Open your vault folder.
+
+3. Navigate to:
+   `.obsidian/plugins/`
+
+4. Create a new folder:
+   `direct-github-sync`
+
+5. Place the downloaded files inside it.
+
+6. Restart Obsidian and enable the plugin from:
+   **Settings → Community Plugins**
+
+---
 
 ## Configuration
 
-Before using the plugin, you must configure your connection settings in the plugin options.
+Before use, configure the connection inside plugin settings.
 
-### 1. Generating a GitHub Personal Access Token (PAT)
-The plugin requires a GitHub PAT to authenticate and modify your repository.
-1.  Log in to GitHub and navigate to **Settings > Developer settings > Personal access tokens > Tokens (classic)**.
-2.  Click **Generate new token (classic)**.
-3.  Give the token a descriptive name (e.g., "Obsidian Vault Sync").
-4.  Under the "Scopes" section, check the box next to **repo** (Full control of private repositories).
-5.  Generate the token and copy it immediately.
+### 1. Create a GitHub Personal Access Token (PAT)
 
-### 2. Plugin Setup
-Open the Direct GitHub Sync settings inside Obsidian and click **Configure Connection**.
-* **Personal Access Token:** Paste your generated token here.
-* **GitHub Username:** The account that owns the repository.
-* **Repository Name:** The name of the repository (e.g., `my-obsidian-vault`). If the repository is empty, the plugin will initialize it automatically.
-* **Branch:** The target branch (defaults to `main`).
+- Go to GitHub Settings  
+- Open **Developer Settings → Personal Access Tokens → Tokens (classic)**  
+- Generate a new token  
+- Select scope: `repo`  
+- Copy the token  
 
-Click **Save Connection Settings** and then **Test Connection** to ensure everything is routed correctly.
+### 2. Configure the plugin
+
+Inside Obsidian:
+
+- Open plugin settings  
+- Enter:
+  - Personal Access Token  
+  - GitHub username  
+  - Repository name  
+  - Branch (default: `main`)  
+
+Save settings and test the connection.
+
+---
 
 ## Usage
 
-You can trigger actions using the Obsidian Command Palette (Ctrl+P / Cmd+P) or the ribbon icons on the left sidebar.
+You can trigger actions from:
 
-* **Sync Vault:** Performs a full bidirectional sync. Downloads remote changes, uploads local changes, and prompts you to resolve any conflicts.
-* **Push to GitHub:** Uploads local changes only. If the remote repository has newer commits, the plugin will warn you before allowing a force-push.
-* **Pull from GitHub:** Downloads remote changes only. The plugin will protect any files that have unpushed local edits from being overwritten.
+- Command Palette (`Ctrl+P` / `Cmd+P`)  
+- Ribbon icons  
 
-### Smart Sync
-If enabled in the settings, Smart Sync will monitor your vault for changes. After a specified period of inactivity (e.g., 5 minutes), it will silently check if a sync is necessary and execute it in the background. If a conflict is detected during a background sync, it will pause and notify you via the status bar to manually resolve it.
+---
+
+### Push to GitHub
+
+Uploads local changes.
+
+- Warns if remote has newer commits  
+- Allows controlled overwrite when explicitly confirmed  
+
+---
+
+### Pull from GitHub
+
+Downloads remote changes.
+
+- Protects local modifications  
+- Detects conflicts before applying changes  
+
+---
+
+### Conflict Handling
+
+If both local and remote have changes:
+
+- The plugin pauses  
+- A resolution dialog appears  
+- You choose how to proceed  
+
+No automatic merging is performed.
+
+---
 
 ## Limitations
 
-* **File Size Limit:** Due to GitHub REST API limitations, individual files larger than 50MB cannot be synced and will be automatically skipped.
-* **Large Repositories:** While the plugin can handle standard vaults easily, repositories with over 100,000 files may experience tree truncation from the GitHub API.
+- **File Size Limit**  
+  Files larger than 50MB are skipped due to GitHub API limits.
 
-## Development
+- **Very Large Vaults**  
+  Extremely large repositories may encounter API limitations (e.g., truncated trees).
 
-If you wish to modify the source code, the project is structured modularly and bundled using `esbuild`.
+---
 
-### Setup
-1.  Clone the repository to a local development folder.
-2.  Run `npm install` to install development dependencies.
+## Planned Improvements
 
-### Build Commands
-* `npm run dev`: Starts `esbuild` in watch mode. Any changes saved to the `src/` directory will automatically recompile into the root `main.js` file.
-* `npm run build`: Compiles a minified, production-ready `main.js` file for distribution.
+The following features are planned but not part of the current release:
 
-## Support this Project by donating
+- **Smart Sync**  
+  A coordination layer that can decide when push or pull is safe to execute automatically.
+
+- **Vault History / Time Travel**  
+  A user-friendly way to navigate and restore previous states using Git history.
+
+These will be built on top of the current manual system once it is fully stabilized.
+
+---
+
+## Support
 
 <div align="center">
   <a href="https://ko-fi.com/xensenx" target="_blank">
@@ -80,4 +181,13 @@ If you wish to modify the source code, the project is structured modularly and b
   </a>
 </div>
 
+---
 
+## Final Note
+
+This plugin is being built in stages.
+
+The current version focuses on reliability and control.  
+More advanced features will be added later, but only after the foundation is proven stable.
+
+Push and pull are the core of the system. Everything else will build on top of that.

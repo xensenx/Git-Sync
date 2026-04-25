@@ -11,7 +11,6 @@ Sync your Obsidian vault with GitHub — without Git, without a local setup, and
 Direct GitHub Sync is built around a simple idea:
 **synchronization should be explicit, predictable, and transparent.**
 
----
 
 ## Why this plugin exists
 
@@ -30,7 +29,6 @@ This plugin takes a different approach:
 
 It is designed for users who want control over synchronization without managing a full Git workflow.
 
----
 
 ## Features
 
@@ -42,7 +40,6 @@ You decide when changes move.
 * Pull downloads remote changes to your vault
 * No background sync or hidden operations
 
----
 
 ### Conflict Detection & Resolution
 
@@ -58,7 +55,6 @@ When the same file changes in multiple places:
 
 No automatic merging is performed.
 
----
 
 ### Cross-Platform Support
 
@@ -67,7 +63,6 @@ No automatic merging is performed.
 
 The plugin works the same way across all platforms.
 
----
 
 ### Status Visibility
 
@@ -79,7 +74,6 @@ A status indicator shows the current state of your vault:
 * Diverged state
 * Errors or offline mode
 
----
 
 ### Ignore Rules
 
@@ -91,7 +85,6 @@ Useful for:
 * generated content
 * private notes
 
----
 
 ## How it works
 
@@ -111,7 +104,6 @@ The plugin communicates directly with the GitHub REST API.
 
 Treat your token like a password. Do not share it.
 
----
 
 ## Data Safety
 
@@ -123,7 +115,6 @@ This plugin can modify both local and remote files.
 
 The system is designed to be safe, but incorrect usage can still lead to data loss.
 
----
 
 ## Installation
 
@@ -134,7 +125,6 @@ The system is designed to be safe, but incorrect usage can still lead to data lo
 3. Search for **Direct GitHub Sync**
 4. Install and enable
 
----
 
 ### Manual Installation
 
@@ -150,7 +140,6 @@ The system is designed to be safe, but incorrect usage can still lead to data lo
 
 3. Restart Obsidian and enable the plugin
 
----
 
 ## Configuration
 
@@ -161,7 +150,6 @@ The system is designed to be safe, but incorrect usage can still lead to data lo
 * Generate a token
 * Enable scope: `repo`
 
----
 
 ### 2. Configure the plugin
 
@@ -174,7 +162,6 @@ Enter the following in plugin settings:
 
 Save and verify the connection.
 
----
 
 ## Usage
 
@@ -189,7 +176,6 @@ Suggested hotkeys:
 * Push: `Ctrl + ↑` or `Ctrl + Page Up`
 * Pull: `Ctrl + ↓` or `Ctrl + Page Down`
 
----
 
 ### Push
 
@@ -197,7 +183,6 @@ Suggested hotkeys:
 * Warns if remote has newer commits
 * Allows controlled overwrite when confirmed
 
----
 
 ### Pull
 
@@ -205,7 +190,6 @@ Suggested hotkeys:
 * Preserves local modifications
 * Detects conflicts before applying changes
 
----
 
 ## Limitations
 
@@ -213,7 +197,6 @@ Suggested hotkeys:
 * Very large vaults may hit repository tree limits
 * Requires a stable internet connection
 
----
 
 ## Planned Improvements
 
@@ -221,7 +204,6 @@ Suggested hotkeys:
 * Vault history and rollback tools
 * Improved handling for large repositories
 
----
 
 ## Support
 
@@ -233,7 +215,6 @@ If this plugin is useful to you:
   </a>
 </p>
 
----
 
 ## Final Notes
 

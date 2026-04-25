@@ -38,7 +38,7 @@
     if (!targets.length) return;
 
     const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry, idx) => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           const el = entry.target;
           const delay = el.dataset.delay || 0;
@@ -46,10 +46,10 @@
           io.unobserve(el);
         }
       });
-    }, { threshold: 0.12 });
+    }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' });
 
     targets.forEach((el, idx) => {
-      if (!el.dataset.delay) el.dataset.delay = idx * 80;
+      if (!el.dataset.delay) el.dataset.delay = idx * 35;
       io.observe(el);
     });
   }

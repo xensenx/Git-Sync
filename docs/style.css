@@ -589,8 +589,8 @@ section + section { border-top: 1px solid var(--border-subtle); }
   align-items: start;
   padding: 1rem 0;
   opacity: 0;
-  transform: translateX(-16px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transform: translateX(-10px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
 .flow-node.visible {
@@ -689,6 +689,15 @@ section + section { border-top: 1px solid var(--border-subtle); }
 
 .footer__links a:hover { color: var(--text-secondary); }
 
+.footer__brand a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.footer__brand a:hover {
+  text-decoration: underline;
+  color: var(--text-muted);
+}
+
 /* ── Section Label ──────────────────────────── */
 .section-label {
   font-size: 0.7rem;
@@ -762,8 +771,8 @@ tr:hover td { background: var(--bg-surface); }
 /* ── Animate on scroll ──────────────────────── */
 .fade-in {
   opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transform: translateY(12px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
 .fade-in.visible {

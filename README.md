@@ -123,7 +123,7 @@ And
 -`ctrl + arrow down` or `ctrl + page down` for pull
 
 
-(This ensures no hotkey conflicts with other shortcuts)
+(This ensures no hotkey conflicts occurs with other shortcuts)
 
 or use.
 

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Direct GitHub Sync</title>
+  <meta name="description" content="Privacy policy and MIT license for Direct GitHub Sync. Open source, inspectable code." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="page-body">
+
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <svg class="nav__brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        Direct GitHub Sync
+      </a>
+      <ul class="nav__links">
+        <li><a href="index.html">Overview</a></li>
+        <li><a href="quick-start.html">Quick Start</a></li>
+        <li><a href="beginners.html">Beginners</a></li>
+        <li><a href="troubleshoot.html">Troubleshoot</a></li>
+        <li><a href="support.html">Support</a></li>
+      </ul>
+      <div class="nav__cta">
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener" class="nav__github">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.742 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          GitHub
+        </a>
+        <a href="quick-start.html" class="btn btn--primary btn--sm">Get Started</a>
+      </div>
+      <button class="nav__menu-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+  <div class="nav__mobile-menu">
+    <a href="index.html">Overview</a>
+    <a href="quick-start.html">Quick Start</a>
+    <a href="beginners.html">Beginners</a>
+    <a href="troubleshoot.html">Troubleshoot</a>
+    <a href="support.html">Support</a>
+    <a href="privacy-policy.html">Privacy</a>
+  </div>
+
+  <main>
+    <div class="container">
+      <div class="page-header">
+        <p class="page-header__label">Legal</p>
+        <h1 class="page-header__title">Privacy Policy &amp; License</h1>
+        <p class="page-header__desc">Direct GitHub Sync is open source software. This page describes how the plugin handles your data and the terms under which it is distributed.</p>
+      </div>
+
+      <section>
+
+        <div class="callout callout--info fade-in">
+          <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <p>The complete source code of this plugin is publicly available and can be reviewed at any time. There are no hidden processes, obfuscated transmissions, or opaque operations. <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener">Inspect the code on GitHub.</a></p>
+        </div>
+
+        <!-- Data Handling -->
+        <div class="legal-section fade-in">
+          <h2 style="margin-bottom:1rem;">Data handling</h2>
+
+          <h3>What data does the plugin access?</h3>
+          <p>The plugin reads the files and folders within your Obsidian vault — the same files that Obsidian itself accesses. It does not read files outside your vault directory.</p>
+
+          <h3 style="margin-top:1.5rem;">Where does that data go?</h3>
+          <p>Your vault contents are transmitted <strong>exclusively to GitHub</strong> via the official GitHub REST API (<code>api.github.com</code>). No data is sent to any other third-party server, analytics service, or external endpoint of any kind. The developer (Sen) has no server infrastructure and receives no data from your plugin usage.</p>
+
+          <h3 style="margin-top:1.5rem;">What about your Personal Access Token?</h3>
+          <p>Your PAT is stored locally in Obsidian's plugin settings on your device, the same way all Obsidian plugin settings are stored. It is used solely to authenticate API requests to GitHub. It is never transmitted elsewhere. You can revoke the token at any time from your GitHub account settings.</p>
+
+          <h3 style="margin-top:1.5rem;">Does the plugin collect telemetry or analytics?</h3>
+          <p>No. There is no telemetry, crash reporting, usage analytics, or any form of tracking. The plugin operates entirely locally between your Obsidian vault and your GitHub account.</p>
+
+          <h3 style="margin-top:1.5rem;">What is stored on GitHub?</h3>
+          <p>Whatever files you choose to sync are stored in your GitHub repository, subject to <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener">GitHub's own privacy policy</a>. If your repository is private, only you and anyone you explicitly grant access to can view the contents. The developer of this plugin has no access to your repository.</p>
+
+          <h3 style="margin-top:1.5rem;">Sync cache</h3>
+          <p>The plugin stores a local sync cache in your vault's settings. This cache records the last known remote commit hash and timestamps to enable efficient incremental syncs. This data never leaves your device and is not sensitive.</p>
+        </div>
+
+        <hr />
+
+        <!-- MIT License -->
+        <div class="legal-section fade-in">
+          <h2 style="margin-bottom:1rem;">MIT License</h2>
+          <p>Direct GitHub Sync is distributed under the MIT License.</p>
+
+          <div class="card" style="margin-top:1.25rem;font-family:var(--font-mono);font-size:0.825rem;line-height:1.8;color:var(--text-secondary);">
+            <p style="color:var(--text-primary);font-weight:500;margin-bottom:0.75rem;font-family:var(--font-body);">MIT License</p>
+            <p>Copyright (c) 2024 Sen (xensenx)</p>
+            <br/>
+            <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+            <br/>
+            <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+            <br/>
+            <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+          </div>
+        </div>
+
+        <hr />
+
+        <!-- Third-party -->
+        <div class="legal-section fade-in">
+          <h2 style="margin-bottom:1rem;">Third-party services</h2>
+          <p>This plugin interacts only with <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> (<code>api.github.com</code>). Use of GitHub is governed by <a href="https://docs.github.com/en/site-policy/github-terms/github-terms-of-service" target="_blank" rel="noopener">GitHub's Terms of Service</a> and <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener">Privacy Statement</a>.</p>
+          <p style="margin-top:0.75rem;">This plugin is not affiliated with, endorsed by, or sponsored by GitHub or Obsidian.</p>
+        </div>
+
+        <hr />
+
+        <!-- Changes -->
+        <div class="legal-section fade-in">
+          <h2 style="margin-bottom:1rem;">Changes to this policy</h2>
+          <p>If this policy changes, updates will be reflected in the GitHub repository. Since the plugin is open source, all code changes that might affect data handling are visible in the commit history.</p>
+          <p style="margin-top:0.75rem;">For questions or concerns, open an issue on <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener">GitHub</a>.</p>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container--wide">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Direct GitHub Sync — by <a href="https://github.com/xensenx" target="_blank" rel="noopener" style="color:var(--purple-soft);margin-left:0.25rem;">Sen</a>
+          &nbsp;·&nbsp; MIT License
+        </div>
+        <ul class="footer__links">
+          <li><a href="quick-start.html">Quick Start</a></li>
+          <li><a href="beginners.html">Beginners</a></li>
+          <li><a href="troubleshoot.html">Troubleshoot</a></li>
+          <li><a href="privacy-policy.html">Privacy</a></li>
+          <li><a href="support.html">Support</a></li>
+          <li><a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener">GitHub</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,251 +1,236 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quick Start — Direct GitHub Sync</title>
-  <meta name="description" content="Quick setup guide for Direct GitHub Sync. Get your Obsidian vault syncing to GitHub in minutes.">
-  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="Fast setup guide for Direct GitHub Sync. For users already familiar with GitHub and Obsidian." />
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="page-body">
 
-<nav class="nav">
-  <a href="index.html" class="nav-logo">
-    <span class="nav-logo-icon">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
-    </span>
-    Direct GitHub Sync
-  </a>
-  <ul class="nav-links">
-    <li><a href="index.html">Home</a></li>
-    <li><a href="quick-start.html" class="active">Quick Start</a></li>
-    <li><a href="beginners.html">Beginners</a></li>
-    <li><a href="troubleshoot.html">Troubleshoot</a></li>
-    <li class="nav-cta"><a href="support.html">Support</a></li>
-  </ul>
-  <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-</nav>
-
-<div class="page-wrapper">
-
-  <!-- Hero -->
-  <div class="page-hero">
-    <div class="page-hero-bg"></div>
-    <div class="container">
-      <div class="section-label">For experienced users</div>
-      <h1>Quick Start</h1>
-      <p class="subtitle">Already have a GitHub account and know your way around? You'll be up and running in under two minutes.</p>
-    </div>
-  </div>
-
-  <div class="container--narrow" style="padding-bottom:5rem;">
-
-    <!-- TOC -->
-    <div class="toc">
-      <h4>On this page</h4>
-      <ol>
-        <li><a href="#install">Install the Plugin</a></li>
-        <li><a href="#pat">Personal Access Token</a></li>
-        <li><a href="#settings">Configure Settings</a></li>
-        <li><a href="#first-sync">First Sync</a></li>
-        <li><a href="#settings-ref">Settings Reference</a></li>
-      </ol>
-    </div>
-
-    <!-- Step 1 -->
-    <section id="install" style="margin-bottom:3rem;">
-      <div class="section-label">Step 1</div>
-      <h2 class="mb-2">Install the Plugin</h2>
-      <p class="mb-3">The plugin is not yet on the Community Plugins browser, so install manually:</p>
-
-      <ol style="color:var(--text-secondary);line-height:2;">
-        <li>Download <code>main.js</code>, <code>manifest.json</code>, and <code>styles.css</code> from the <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub repo</a>.</li>
-        <li>Create the folder <code>&lt;vault&gt;/.obsidian/plugins/direct-github-sync/</code></li>
-        <li>Drop all three files into that folder.</li>
-        <li>In Obsidian → <strong>Settings → Community Plugins</strong>, disable Safe Mode if needed, then enable <strong>Direct GitHub Sync</strong>.</li>
-      </ol>
-
-      <div class="callout callout--tip mt-2">
-        <span class="callout-icon">💡</span>
-        <div class="callout-body">
-          <strong>Tip</strong>
-          <p>On mobile, use a file manager app (e.g. Files on iOS, solid explorer on Android) to navigate to your vault folder and create the plugin directory.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 2 -->
-    <section id="pat" style="margin-bottom:3rem;">
-      <div class="section-label">Step 2</div>
-      <h2 class="mb-2">Personal Access Token</h2>
-      <p class="mb-3">DGS authenticates via a GitHub PAT with <code>repo</code> scope (or <code>public_repo</code> for public repos only).</p>
-
-      <ol style="color:var(--text-secondary);line-height:2.2;">
-        <li>Go to <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></li>
-        <li>Click <strong>Generate new token (classic)</strong></li>
-        <li>Set a note, choose expiry, tick <strong>repo</strong> scope</li>
-        <li>Click <strong>Generate token</strong> — copy it immediately, it won't show again</li>
-      </ol>
-
-      <div class="callout callout--warning mt-2">
-        <span class="callout-icon">⚠️</span>
-        <div class="callout-body">
-          <strong>Store it safely</strong>
-          <p>Treat your PAT like a password. Keep it in a password manager. If it leaks, revoke it immediately from GitHub Settings.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 3 -->
-    <section id="settings" style="margin-bottom:3rem;">
-      <div class="section-label">Step 3</div>
-      <h2 class="mb-2">Configure Settings</h2>
-      <p class="mb-3">Open <strong>Settings → Direct GitHub Sync</strong> and fill in:</p>
-
-      <div class="code-block mb-3">
-        <div class="code-block-header">
-          <span>Required Fields</span>
-        </div>
-        <pre>GitHub PAT      →  ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GitHub Username →  your-github-username
-Repository Name →  your-vault-repo
-Branch          →  main  (or master, or whatever you use)</pre>
-      </div>
-
-      <p class="mb-3">Optional but recommended:</p>
-      <div class="code-block">
-        <div class="code-block-header"><span>Optional Fields</span></div>
-        <pre>Device Name     →  MacBook / Phone / etc.
-Auto-Sync       →  Enable + set idle interval (minutes)
-Sync on Startup →  ✓ Enabled
-Ignore .obsidian→  ✓ Enabled (default)</pre>
-      </div>
-    </section>
-
-    <!-- Step 4 -->
-    <section id="first-sync" style="margin-bottom:3rem;">
-      <div class="section-label">Step 4</div>
-      <h2 class="mb-2">First Sync</h2>
-      <p class="mb-3">Click the sync icon in the left ribbon, or open the Command Palette (<kbd>Ctrl/Cmd + P</kbd>) and run <code>Direct GitHub Sync: Sync Now</code>.</p>
-
-      <p>On first sync:</p>
-      <ul style="color:var(--text-secondary);line-height:2;margin-top:0.5rem;">
-        <li>If the repo is <strong>empty</strong> — your vault is pushed as the initial commit.</li>
-        <li>If the repo has <strong>existing files</strong> — they're pulled down and merged with your local vault.</li>
-        <li>If the repo <strong>doesn't exist yet</strong> — create it on GitHub first (can be private), then sync.</li>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <svg class="nav__brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        Direct GitHub Sync
+      </a>
+      <ul class="nav__links">
+        <li><a href="index.html">Overview</a></li>
+        <li><a href="quick-start.html">Quick Start</a></li>
+        <li><a href="beginners.html">Beginners</a></li>
+        <li><a href="troubleshoot.html">Troubleshoot</a></li>
+        <li><a href="support.html">Support</a></li>
       </ul>
-    </section>
-
-    <!-- Settings Reference -->
-    <section id="settings-ref" style="margin-bottom:3rem;">
-      <div class="section-label">Reference</div>
-      <h2 class="mb-3">Settings Reference</h2>
-
-      <div style="display:flex;flex-direction:column;gap:0.75rem;">
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>GitHub PAT</h4>
-            <span class="badge badge--purple">Required</span>
-          </div>
-          <p style="font-size:0.88rem;">Your Personal Access Token. Must have <code>repo</code> scope for private repos, <code>public_repo</code> for public only.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Username</h4>
-            <span class="badge badge--purple">Required</span>
-          </div>
-          <p style="font-size:0.88rem;">Your exact GitHub username, case-sensitive. Used to construct API endpoints.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Repository</h4>
-            <span class="badge badge--purple">Required</span>
-          </div>
-          <p style="font-size:0.88rem;">The repository name (not the full URL). E.g. <code>my-obsidian-vault</code></p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Branch</h4>
-            <span class="badge badge--amber">Default: main</span>
-          </div>
-          <p style="font-size:0.88rem;">Which branch to sync to. Defaults to <code>main</code>. Change to <code>master</code> or any custom branch as needed.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Ignored Paths</h4>
-            <span class="badge badge--green">Optional</span>
-          </div>
-          <p style="font-size:0.88rem;">One rule per line. Supports exact paths, directory prefixes (<code>private/</code>), and glob wildcards (<code>*.canvas</code>). <code>.obsidian/</code> has its own toggle above.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Device Name</h4>
-            <span class="badge badge--green">Optional</span>
-          </div>
-          <p style="font-size:0.88rem;">Appears in commit messages as <code>Vault sync from MacBook: 22 Apr 2026 at 14:30</code>. Helps identify which device made a change.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Auto Sync + Interval</h4>
-            <span class="badge badge--green">Optional</span>
-          </div>
-          <p style="font-size:0.88rem;">When enabled, DGS fires a sync after the vault has been idle for the specified number of minutes. Defaults to 5 minutes.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Sync on Startup</h4>
-            <span class="badge badge--amber">Default: on</span>
-          </div>
-          <p style="font-size:0.88rem;">Automatically pulls from remote when Obsidian launches. Keeps your vault current before you start editing.</p>
-        </div>
-
-        <div class="card" style="padding:1.25rem;">
-          <div class="flex-center gap-2 mb-1">
-            <h4>Concurrency</h4>
-            <span class="badge badge--amber">Default: 5</span>
-          </div>
-          <p style="font-size:0.88rem;">How many files to upload/download simultaneously. Reduce to 2–3 on slower connections or if you hit rate limits.</p>
-        </div>
-
+      <div class="nav__cta">
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener" class="nav__github">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.742 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          GitHub
+        </a>
+        <a href="quick-start.html" class="btn btn--primary btn--sm">Get Started</a>
       </div>
-    </section>
+      <button class="nav__menu-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+  <div class="nav__mobile-menu">
+    <a href="index.html">Overview</a>
+    <a href="quick-start.html">Quick Start</a>
+    <a href="beginners.html">Beginners</a>
+    <a href="troubleshoot.html">Troubleshoot</a>
+    <a href="support.html">Support</a>
+    <a href="privacy-policy.html">Privacy</a>
+  </div>
 
-    <div class="callout callout--info">
-      <span class="callout-icon">ℹ️</span>
-      <div class="callout-body">
-        <strong>Running into issues?</strong>
-        <p>Check the <a href="troubleshoot.html">Troubleshoot page</a> for a full list of errors and their fixes.</p>
+  <main>
+    <div class="container">
+      <div class="page-header">
+        <p class="page-header__label">Quick Start</p>
+        <h1 class="page-header__title">Up and running in minutes</h1>
+        <p class="page-header__desc">For users already familiar with GitHub, PATs, and Obsidian's Community Plugins. Skip the hand-holding.</p>
+      </div>
+
+      <section>
+        <div class="callout callout--info">
+          <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p>New to GitHub or unsure about any of these steps? <a href="beginners.html">Read the full guide for beginners</a> — it covers everything from account creation.</p>
+        </div>
+
+        <div class="steps">
+          <!-- Step 1 -->
+          <div class="step fade-in">
+            <div class="step__line"></div>
+            <div class="step__num">1</div>
+            <div class="step__content">
+              <h3>Install the plugin</h3>
+              <p>In Obsidian, open <strong>Settings → Community Plugins → Browse</strong>. Search for <strong>Direct GitHub Sync</strong> and install it. Enable it after installation.</p>
+              <div class="callout callout--warning" style="margin-top:1rem;">
+                <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <p>Community Plugins must be enabled first. Go to <strong>Settings → Community Plugins</strong> and turn off Restricted Mode.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step fade-in">
+            <div class="step__line"></div>
+            <div class="step__num">2</div>
+            <div class="step__content">
+              <h3>Create a GitHub repository</h3>
+              <p>Create a new GitHub repository for your vault. It can be public or private. Leave it empty — the plugin will populate it on first push.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step fade-in">
+            <div class="step__line"></div>
+            <div class="step__num">3</div>
+            <div class="step__content">
+              <h3>Generate a Personal Access Token</h3>
+              <p>Go to <strong>GitHub → Settings → Developer Settings → Personal access tokens → Fine-grained tokens</strong>.</p>
+              <p style="margin-top:0.75rem;">Required permissions on the repository:</p>
+              <ul style="margin-top:0.5rem;color:var(--text-secondary);">
+                <li><strong>Contents</strong> — Read and write</li>
+                <li><strong>Metadata</strong> — Read-only</li>
+              </ul>
+              <div class="callout callout--info" style="margin-top:1rem;">
+                <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <p>Your token must begin with <code>ghp_</code> or <code>github_pat_</code>. The plugin validates this on save.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step fade-in">
+            <div class="step__line"></div>
+            <div class="step__num">4</div>
+            <div class="step__content">
+              <h3>Configure the plugin</h3>
+              <p>Open <strong>Settings → Direct GitHub Sync</strong> and fill in:</p>
+              <div style="margin-top:1rem;overflow-x:auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>Personal Access Token</code></td>
+                      <td>Your PAT starting with <code>ghp_</code> or <code>github_pat_</code></td>
+                    </tr>
+                    <tr>
+                      <td><code>GitHub Username</code></td>
+                      <td>Your GitHub handle</td>
+                    </tr>
+                    <tr>
+                      <td><code>Repository Name</code></td>
+                      <td>The repo name (not the full URL)</td>
+                    </tr>
+                    <tr>
+                      <td><code>Branch</code></td>
+                      <td><code>main</code> (default) or your preferred branch</td>
+                    </tr>
+                    <tr>
+                      <td><code>Device Name</code></td>
+                      <td>Optional — useful for multi-device tracking</td>
+                    </tr>
+                    <tr>
+                      <td><code>Ignored Paths</code></td>
+                      <td>Comma-separated list of paths to exclude</td>
+                    </tr>
+                    <tr>
+                      <td><code>Concurrency</code></td>
+                      <td><code>5</code> (default, adjust if needed)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="step fade-in">
+            <div class="step__line"></div>
+            <div class="step__num">5</div>
+            <div class="step__content">
+              <h3>Push your vault</h3>
+              <p>Open the Command Palette (<kbd>Ctrl/Cmd + P</kbd>) and run <strong>Direct GitHub Sync: Push vault to GitHub</strong>. The status bar at the bottom will display sync progress.</p>
+            </div>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="step fade-in">
+            <div class="step__num">6</div>
+            <div class="step__content">
+              <h3>Pull on another device</h3>
+              <p>Repeat steps 1 and 4 on any other device, using the same repo details. Then run <strong>Direct GitHub Sync: Pull vault from GitHub</strong> to download your vault.</p>
+            </div>
+          </div>
+        </div>
+
+        <hr />
+
+        <h2 class="fade-in" style="margin-bottom:1.5rem;">Settings reference</h2>
+
+        <div class="card fade-in" style="margin-bottom:1rem;">
+          <h4 style="color:var(--text-primary);margin-bottom:0.5rem;font-family:var(--font-mono);font-size:0.9rem;">ignoreObsidianDir</h4>
+          <p style="font-size:0.9rem;">When enabled (default), the <code>.obsidian</code> folder is excluded from sync. This is recommended if you use different themes or plugins per device.</p>
+        </div>
+
+        <div class="card fade-in" style="margin-bottom:1rem;">
+          <h4 style="color:var(--text-primary);margin-bottom:0.5rem;font-family:var(--font-mono);font-size:0.9rem;">ignoredPaths</h4>
+          <p style="font-size:0.9rem;">Newline or comma-separated list of paths to exclude. Supports simple prefix matching. Example: <code>Private/, Archive/old</code>.</p>
+        </div>
+
+        <div class="card fade-in" style="margin-bottom:1rem;">
+          <h4 style="color:var(--text-primary);margin-bottom:0.5rem;font-family:var(--font-mono);font-size:0.9rem;">concurrency</h4>
+          <p style="font-size:0.9rem;">Number of files uploaded simultaneously. Default is <code>5</code>. Reduce if you encounter secondary rate-limit errors on large vaults.</p>
+        </div>
+
+        <div class="card fade-in">
+          <h4 style="color:var(--text-primary);margin-bottom:0.5rem;font-family:var(--font-mono);font-size:0.9rem;">deviceName</h4>
+          <p style="font-size:0.9rem;">An optional label for this device. Useful when syncing across multiple machines — commit messages will include the device name so you can trace which machine made which change.</p>
+        </div>
+
+        <hr />
+
+        <div class="callout callout--warning">
+          <svg class="callout__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <p>The plugin does not auto-resolve merge conflicts. If both a local and remote file have changed since last sync, the remote version will win on pull. Always push before switching devices.</p>
+        </div>
+
+        <div style="margin-top:2rem;" class="fade-in">
+          <p>Hitting an error or unexpected behaviour? <a href="troubleshoot.html">Check the troubleshooting guide.</a></p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container--wide">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Direct GitHub Sync — by <a href="https://github.com/xensenx" target="_blank" rel="noopener" style="color:var(--purple-soft);margin-left:0.25rem;">Sen</a>
+          &nbsp;·&nbsp; MIT License
+        </div>
+        <ul class="footer__links">
+          <li><a href="quick-start.html">Quick Start</a></li>
+          <li><a href="beginners.html">Beginners</a></li>
+          <li><a href="troubleshoot.html">Troubleshoot</a></li>
+          <li><a href="privacy-policy.html">Privacy</a></li>
+          <li><a href="support.html">Support</a></li>
+          <li><a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener">GitHub</a></li>
+        </ul>
       </div>
     </div>
+  </footer>
 
-  </div>
-</div>
-
-<footer class="footer">
-  <div class="container">
-    <div class="footer-inner">
-      <div class="footer-left">
-        <span class="footer-logo">Direct GitHub Sync</span>
-        <span class="footer-meta">by Sen · MIT License</span>
-      </div>
-      <div class="footer-links">
-        <a href="index.html">Home</a>
-        <a href="troubleshoot.html">Troubleshoot</a>
-        <a href="support.html">Support</a>
-        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
-      </div>
-    </div>
-  </div>
-</footer>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

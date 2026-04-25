@@ -1,209 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Direct GitHub Sync — Obsidian Plugin</title>
-  <meta name="description" content="Push and pull your entire Obsidian vault to/from GitHub without Git or Node.js. Works on desktop and mobile.">
-  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="Push and pull your entire Obsidian vault to GitHub without needing Git or Node.js. Works on desktop and mobile." />
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="page-body">
 
-<!-- ── Navigation ─────────────────────────────────── -->
-<nav class="nav">
-  <a href="index.html" class="nav-logo">
-    <span class="nav-logo-icon">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
-    </span>
-    Direct GitHub Sync
-  </a>
-  <ul class="nav-links">
-    <li><a href="index.html" class="active">Home</a></li>
-    <li><a href="quick-start.html">Quick Start</a></li>
-    <li><a href="beginners.html">Beginners</a></li>
-    <li><a href="troubleshoot.html">Troubleshoot</a></li>
-    <li class="nav-cta"><a href="support.html">Support</a></li>
-  </ul>
-  <button class="nav-hamburger" aria-label="Toggle menu">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
+  <!-- Navigation -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <svg class="nav__brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        Direct GitHub Sync
+      </a>
 
-<!-- ── Page ───────────────────────────────────────── -->
-<div class="page-wrapper">
+      <ul class="nav__links">
+        <li><a href="index.html">Overview</a></li>
+        <li><a href="quick-start.html">Quick Start</a></li>
+        <li><a href="beginners.html">Beginners</a></li>
+        <li><a href="troubleshoot.html">Troubleshoot</a></li>
+        <li><a href="support.html">Support</a></li>
+      </ul>
 
-  <!-- Hero -->
-  <section style="position:relative; overflow:hidden; padding: 7rem 0 5rem;">
-    <div class="ambient-bg ambient-1"></div>
-    <div class="ambient-bg ambient-2"></div>
-    <!-- grid lines -->
-    <div style="position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px, transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black,transparent);pointer-events:none;opacity:0.4;"></div>
+      <div class="nav__cta">
+        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener" class="nav__github">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.742 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          GitHub
+        </a>
+        <a href="quick-start.html" class="btn btn--primary btn--sm">Get Started</a>
+      </div>
 
-    <div class="container" style="position:relative;z-index:1;">
-      <div style="max-width:700px;">
-        <div class="flex flex-wrap gap-2 mb-3 animate-up">
-          <span class="badge badge--purple">✦ Obsidian Plugin</span>
-          <span class="badge badge--green">v2.0.0</span>
-          <span class="badge badge--amber">No Git Required</span>
+      <button class="nav__menu-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="nav__mobile-menu">
+    <a href="index.html">Overview</a>
+    <a href="quick-start.html">Quick Start</a>
+    <a href="beginners.html">Beginners</a>
+    <a href="troubleshoot.html">Troubleshoot</a>
+    <a href="support.html">Support</a>
+    <a href="privacy-policy.html">Privacy</a>
+  </div>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero__badge fade-in">
+          <span class="badge badge--purple">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>
+            Obsidian Plugin · v1.0.0
+          </span>
         </div>
 
-        <h1 class="animate-up" style="animation-delay:0.08s;">
-          Sync your vault.<br>
-          <span class="text-purple">No setup headaches.</span>
+        <h1 class="hero__title fade-in" data-delay="80">
+          Your vault.<br/>
+          <span>Backed by GitHub.</span>
         </h1>
 
-        <p class="animate-up" style="font-size:1.15rem;margin-top:1.25rem;margin-bottom:2rem;max-width:56ch;animation-delay:0.16s;">
-          Direct GitHub Sync pushes and pulls your entire Obsidian vault to a GitHub repository — no Git installation, no Node.js, no terminal. Works seamlessly on both desktop and mobile.
+        <p class="hero__desc fade-in" data-delay="160">
+          Push and pull your entire Obsidian vault to a GitHub repository — no Git installation, no Node.js, no terminal required. Works seamlessly on desktop and mobile.
         </p>
 
-        <div class="flex flex-wrap gap-3 animate-up" style="animation-delay:0.24s;">
-          <a href="beginners.html" class="btn btn-primary btn-lg">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            Get Started
+        <div class="hero__actions fade-in" data-delay="240">
+          <a href="beginners.html" class="btn btn--primary btn--lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            Start from scratch
           </a>
-          <a href="quick-start.html" class="btn btn-secondary btn-lg">Quick Start</a>
-          <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="btn btn-ghost btn-lg">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.09.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .269.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
-            GitHub
+          <a href="quick-start.html" class="btn btn--secondary btn--lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Quick setup
           </a>
         </div>
+
+        <div class="hero__meta fade-in" data-delay="320">
+          <span class="hero__meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Desktop
+          </span>
+          <span class="hero__meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            Mobile
+          </span>
+          <span class="hero__meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489"/><path d="M15 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+            No Git required
+          </span>
+          <span class="hero__meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            MIT License
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section>
+      <div class="container">
+        <p class="section-label fade-in">How it works</p>
+        <h2 class="fade-in" style="margin-bottom:0.5rem;">One plugin. Two directions.</h2>
+        <p class="fade-in" style="max-width:480px;margin-bottom:2.5rem;">Direct GitHub Sync communicates directly with the GitHub API, treating your vault as source of truth.</p>
+
+        <div class="flow">
+          <div class="flow-node">
+            <div class="flow-node__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            </div>
+            <div class="flow-node__content">
+              <div class="flow-node__title">Your Obsidian Vault</div>
+              <div class="flow-node__desc">All your notes, attachments, and settings — exactly where they are.</div>
+            </div>
+          </div>
+
+          <div class="flow-node">
+            <div class="flow-node__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="flow-node__content">
+              <div class="flow-node__title">Plugin processes your files</div>
+              <div class="flow-node__desc">Reads vault contents, handles encoding, normalises paths, and resolves conflicts. Ignored paths and the <code>.obsidian</code> directory can be excluded.</div>
+            </div>
+          </div>
+
+          <div class="flow-node">
+            <div class="flow-node__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+            </div>
+            <div class="flow-node__content">
+              <div class="flow-node__title">Direct GitHub API call</div>
+              <div class="flow-node__desc">No middleman, no local Git daemon. The plugin communicates with the GitHub REST API using your Personal Access Token, with automatic retry and rate-limit handling.</div>
+            </div>
+          </div>
+
+          <div class="flow-node">
+            <div class="flow-node__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.742 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+            </div>
+            <div class="flow-node__content">
+              <div class="flow-node__title">GitHub Repository</div>
+              <div class="flow-node__desc">Your vault lives as a standard repository. Version history, branch control, and access anywhere — all through GitHub's interface.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key features -->
+    <section>
+      <div class="container">
+        <p class="section-label fade-in">Capabilities</p>
+        <h2 class="fade-in" style="margin-bottom:2rem;">What it handles</h2>
+
+        <div class="grid-2">
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Mobile &amp; Desktop</h3>
+            <p style="font-size:0.9rem;">Works on iOS, Android, Windows, macOS, and Linux. No native dependencies.</p>
+          </div>
+
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Retry &amp; Rate Limit Handling</h3>
+            <p style="font-size:0.9rem;">Automatic retries with exponential backoff when GitHub's API rate-limits your requests.</p>
+          </div>
+
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Ignore Paths</h3>
+            <p style="font-size:0.9rem;">Exclude the <code>.obsidian</code> folder, specific files, or custom patterns from syncing.</p>
+          </div>
+
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Concurrency Control</h3>
+            <p style="font-size:0.9rem;">Configurable concurrent uploads prevent overwhelming the API while keeping syncs fast.</p>
+          </div>
+
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Case-Conflict Detection</h3>
+            <p style="font-size:0.9rem;">Flags files that differ only in capitalisation, which can cause silent data loss on case-insensitive filesystems.</p>
+          </div>
+
+          <div class="card fade-in">
+            <div style="color:var(--purple-soft);margin-bottom:0.75rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <h3 style="margin-bottom:0.35rem;">Sync Cache</h3>
+            <p style="font-size:0.9rem;">Tracks the last known remote commit to allow incremental, efficient pull operations.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA strip -->
+    <section>
+      <div class="container">
+        <div class="card fade-in" style="text-align:center;padding:3rem 2rem;">
+          <h2 style="margin-bottom:0.75rem;">Ready to get started?</h2>
+          <p style="margin-bottom:2rem;max-width:460px;margin-left:auto;margin-right:auto;">
+            New to GitHub? No problem — the beginners guide covers everything from creating an account to your first sync.
+          </p>
+          <div class="flex flex-wrap gap-2 items-center" style="justify-content:center;">
+            <a href="beginners.html" class="btn btn--primary">Complete setup guide</a>
+            <a href="quick-start.html" class="btn btn--secondary">I know what I'm doing</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container--wide">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Direct GitHub Sync — by <a href="https://github.com/xensenx" target="_blank" rel="noopener" style="color:var(--purple-soft);margin-left:0.25rem;">Sen</a>
+          &nbsp;·&nbsp; MIT License
+        </div>
+        <ul class="footer__links">
+          <li><a href="quick-start.html">Quick Start</a></li>
+          <li><a href="beginners.html">Beginners</a></li>
+          <li><a href="troubleshoot.html">Troubleshoot</a></li>
+          <li><a href="privacy-policy.html">Privacy</a></li>
+          <li><a href="support.html">Support</a></li>
+          <li><a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" rel="noopener">GitHub</a></li>
+        </ul>
       </div>
     </div>
-  </section>
+  </footer>
 
-  <!-- Features -->
-  <section class="section">
-    <div class="container">
-      <div class="section-label">What it does</div>
-      <h2 class="mb-4">Everything you need, nothing you don't.</h2>
-
-      <div class="grid-3">
-        <div class="card animate-up">
-          <div class="card-icon">🔄</div>
-          <h3>Smart Sync</h3>
-          <p>Three-way diff engine compares local, base, and remote states. Only changed files are touched — fast and bandwidth-friendly.</p>
-        </div>
-        <div class="card animate-up">
-          <div class="card-icon">📱</div>
-          <h3>Mobile-First</h3>
-          <p>Works identically on iOS and Android Obsidian. No workarounds, no companion apps. Pure API calls.</p>
-        </div>
-        <div class="card animate-up">
-          <div class="card-icon">⚡</div>
-          <h3>Auto Sync</h3>
-          <p>Set a quiet idle timer and DGS syncs automatically in the background. Zero manual effort after setup.</p>
-        </div>
-        <div class="card animate-up">
-          <div class="card-icon">🔒</div>
-          <h3>Private Repos</h3>
-          <p>Full support for private repositories via Personal Access Tokens. Your notes stay yours.</p>
-        </div>
-        <div class="card animate-up">
-          <div class="card-icon">🚫</div>
-          <h3>Path Ignoring</h3>
-          <p>Exclude files or folders with simple glob patterns. <code>.obsidian/</code> is excluded by default.</p>
-        </div>
-        <div class="card animate-up">
-          <div class="card-icon">🏷️</div>
-          <h3>Device Labels</h3>
-          <p>Tag each commit with a device name. Know exactly which machine or phone made a change.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- How it works -->
-  <section class="section" style="background: var(--bg-surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-    <div class="container">
-      <div class="section-label">The process</div>
-      <h2 class="mb-4">How it works</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;">
-        <div class="step-card animate-up">
-          <div class="step-num">1</div>
-          <h3>Connect</h3>
-          <div class="step-body">Enter your GitHub PAT, username, and repo name in the plugin settings. One-time setup.</div>
-        </div>
-        <div class="step-card animate-up">
-          <div class="step-num">2</div>
-          <h3>Pull</h3>
-          <div class="step-body">DGS fetches the remote repo tree and downloads only what's changed since your last sync.</div>
-        </div>
-        <div class="step-card animate-up">
-          <div class="step-num">3</div>
-          <h3>Write</h3>
-          <div class="step-body">Take notes in Obsidian as normal. DGS watches for changes in the background.</div>
-        </div>
-        <div class="step-card animate-up">
-          <div class="step-num">4</div>
-          <h3>Push</h3>
-          <div class="step-body">Tap sync or let auto-sync fire. Changed files are committed and pushed to GitHub instantly.</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Pick your path -->
-  <section class="section">
-    <div class="container">
-      <div class="section-label">Docs</div>
-      <h2 class="mb-2">Pick your path</h2>
-      <p class="mb-6">Choose the guide that matches your experience level.</p>
-      <div class="grid-2">
-        <a href="beginners.html" class="card" style="text-decoration:none;display:block;">
-          <div class="card-icon">🌱</div>
-          <h3>Complete Beginner</h3>
-          <p>Never used GitHub? That's totally fine. This guide walks you from zero — creating a GitHub account, generating a token, and getting your first sync working.</p>
-          <div style="margin-top:1rem;" class="badge badge--green">Start here</div>
-        </a>
-        <a href="quick-start.html" class="card" style="text-decoration:none;display:block;">
-          <div class="card-icon">⚡</div>
-          <h3>Experienced User</h3>
-          <p>Already have a GitHub account and PAT? Jump straight to the settings reference and get syncing in under two minutes.</p>
-          <div style="margin-top:1rem;" class="badge badge--purple">Quick Setup</div>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- MIT / author -->
-  <section class="section--sm">
-    <div class="container">
-      <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;">
-        <div>
-          <div class="section-label" style="margin-bottom:0.5rem;">Open Source</div>
-          <h3 style="margin-bottom:0.35rem;">MIT Licensed — free forever</h3>
-          <p style="font-size:0.9rem;max-width:50ch;">Built by <a href="https://github.com/xensenx" target="_blank" style="color:var(--purple-glow);">Sen</a>. Contributions, issues, and ideas are always welcome on GitHub.</p>
-        </div>
-        <div class="flex gap-3 flex-wrap">
-          <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank" class="btn btn-secondary">View on GitHub</a>
-          <a href="support.html" class="btn btn-ghost">Support the project</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-</div>
-
-<!-- ── Footer ─────────────────────────────────────── -->
-<footer class="footer">
-  <div class="container">
-    <div class="footer-inner">
-      <div class="footer-left">
-        <span class="footer-logo">Direct GitHub Sync</span>
-        <span class="footer-meta">by Sen · MIT License</span>
-      </div>
-      <div class="footer-links">
-        <a href="index.html">Home</a>
-        <a href="quick-start.html">Quick Start</a>
-        <a href="beginners.html">Beginners</a>
-        <a href="troubleshoot.html">Troubleshoot</a>
-        <a href="support.html">Support</a>
-        <a href="https://github.com/xensenx/Direct-GitHub-Sync" target="_blank">GitHub ↗</a>
-      </div>
-    </div>
-  </div>
-</footer>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

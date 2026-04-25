@@ -1,0 +1,17 @@
+{
+  "name": "dgs-workspace---env",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "dev": "esbuild src/main.js --bundle --external:obsidian --format=cjs --platform=node --outfile=main.js --watch",
+    "build": "esbuild src/main.js --bundle --external:obsidian --format=cjs --platform=node --outfile=main.js --minify"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

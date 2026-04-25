@@ -193,6 +193,7 @@ If this project is useful to you, you can support development:
     <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" width="250" />
   </a>
 </div>
+
 ---
 
 ## Final Note
